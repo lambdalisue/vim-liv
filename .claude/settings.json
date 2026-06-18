@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(busted:*)",
+      "Bash(luacheck:*)",
+      "Bash(stylua:*)",
+      "Bash(luarocks:*)",
+      "Bash(lua:*)",
+      "Bash(luajit:*)",
+      "Bash(nvim --headless:*)",
+      "Bash(vim -es:*)",
+      "Bash(vim -e:*)",
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)"
+    ]
+  }
+}

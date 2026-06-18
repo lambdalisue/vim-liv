@@ -1,0 +1,47 @@
+-- L3 integration test for liv.std.sign (spec 0006), on both editors. sign_* is
+-- shared vimscript, so the same assertions hold on Vim and Neovim; liv.sign.placed
+-- (over sign_getplaced) is the query. Verifies the lifecycle and that liv ids are
+-- globally unique so remove/clear need no group.
+local sign = require("liv.std.sign")
+local core = require("liv.core")
+
+describe("liv.std.sign (L3)", function()
+  before_each(function()
+    core.cmd("enew!")
+    core.call("setline", 1, core.list({ "one", "two", "three", "four" }))
+    sign.define("LivTest", { text = ">>", text_hl = "Search", line_hl = "Visual" })
+  end)
+
+  it("places a sign and returns an id", function()
+    local id = sign.place(0, 2, "LivTest", { group = "g", priority = 20 })
+    assert.equal("number", type(id))
+    local ps = sign.placed(0, { group = "g" })
+    assert.equal(1, #ps)
+    assert.equal(2, ps[1].line)
+    assert.equal("LivTest", ps[1].name)
+    sign.remove(0, id)
+    assert.equal(0, #sign.placed(0, { group = "g" }))
+  end)
+
+  it("clear removes liv signs, optionally filtered by group", function()
+    sign.place(0, 1, "LivTest", { group = "a" })
+    sign.place(0, 2, "LivTest", { group = "a" })
+    sign.place(0, 3, "LivTest", { group = "b" })
+    assert.equal(2, #sign.placed(0, { group = "a" }))
+    sign.clear(0, { group = "a" })
+    assert.equal(0, #sign.placed(0, { group = "a" }))
+    assert.equal(1, #sign.placed(0, { group = "b" }))
+    sign.clear(0)
+    assert.equal(0, #sign.placed(0))
+  end)
+
+  it("gives globally-unique ids so remove needs no group", function()
+    local id1 = sign.place(0, 1, "LivTest", { group = "x" })
+    local id2 = sign.place(0, 2, "LivTest", { group = "y" })
+    assert.are_not.equal(id1, id2)
+    sign.remove(0, id1)
+    assert.equal(0, #sign.placed(0, { group = "x" }))
+    assert.equal(1, #sign.placed(0, { group = "y" }))
+    sign.remove(0, id2)
+  end)
+end)

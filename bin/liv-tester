@@ -1,0 +1,19 @@
+#!/usr/bin/env luajit
+-- liv-tester — run a liv plugin's specs on both editors with no per-project
+-- runner boilerplate. Invoke from a plugin's root:  /path/to/vim-liv/bin/liv-tester
+-- It self-locates the vim-liv install (from this script's path) and treats the
+-- current working directory as the plugin under test (its spec/ and test/).
+local here = arg[0]:match("^(.*)/[^/]+$") or "."
+local root = io.popen("cd '" .. here .. "/..' && pwd"):read("*l")
+local project = io.popen("pwd"):read("*l")
+
+package.path = table.concat({
+  root .. "/lua/?.lua",
+  root .. "/lua/?/init.lua",
+  project .. "/lua/?.lua",
+  project .. "/lua/?/init.lua",
+  package.path,
+}, ";")
+
+local failed = require("liv.tester.cli").main({ root = root, project = project })
+os.exit(failed == 0 and 0 or 1)

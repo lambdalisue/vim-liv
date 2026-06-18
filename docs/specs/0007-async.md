@@ -27,6 +27,30 @@ schedule (resume on main loop)        leaf: sleep / system / channel
 Callbacks are passed as plain Lua functions (no `register`; see [0004](0004-core.md));
 cancellation uses the domain id (timer/job).
 
+## `liv.std.task` — the editor-bound runner
+
+`liv.std.task` is the editor-bound facade: it selects the leaf backend once at
+import and wires `schedule`/`timer`/`wait` into `liv.lua.async`, re-exporting the
+pure `await`/`wrap`. (Re-exporting the *pure* helpers on an honestly editor-bound
+module is fine — it does not hide editor-dependence.)
+
+- `task.run(afn[, on_done])` → a handle `{ done, ok, result, cancel }`; runs `afn`
+  with the editor `schedule` injected.
+- `task.await` / `task.wrap` — the pure engine helpers.
+- `task.sleep(ms)` — inside an async function, suspend ~`ms` then resume (one-shot
+  timer leaf: `vim.uv` on Neovim, `timer_start` on Vim).
+- `task.schedule(fn)` — run `fn` on the editor's main loop.
+- `task.block(handle[, timeout])` — **synchronously pump the editor loop** until
+  the task finishes, returning `(ok, result)`. This is a **drive-to-completion**
+  helper for scripts / CI / `:Liv*` commands that must finish before returning —
+  **not** for interactive use, where the editor already pumps the loop and
+  blocking would freeze the UI. `handle.done` stays false on timeout (it returns
+  rather than hangs). Pump: `vim.wait` on Neovim, a `:sleep` loop on Vim (which
+  processes timers even in headless `-es`).
+
+Verified on both editors that a chained zero-delay `timer_start(0, fn)` (the Vim
+resume path) fires under the `:sleep` pump, so suspend/resume works in headless.
+
 ## Runner + await (pure Lua)
 
 An async function runs inside a coroutine and calls `await(task)`, where

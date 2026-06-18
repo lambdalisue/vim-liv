@@ -1,0 +1,27 @@
+#!/usr/bin/env luajit
+-- liv-bundler — vendor liv (and deps) into a plugin from the terminal (no editor).
+-- Self-locates the vim-liv install and delegates to liv.bundler.cli. Standalone
+-- runs use the `path` source (--from=<dir>); the `rtp` source needs the editor
+-- (:LivBundle).
+--   liv-bundler liv.std.buffer --source=path --from=/path/to/vim-liv/lua \
+--               --plugin=myplugin --to=/path/to/myplugin
+local here = arg[0]:match("^(.*)/[^/]+$") or "."
+local root = io.popen("cd '" .. here .. "/..' && pwd"):read("*l")
+package.path = table.concat({
+  root .. "/lua/?.lua",
+  root .. "/lua/?/init.lua",
+  package.path,
+}, ";")
+
+local cli = require("liv.bundler.cli")
+local opts = cli.parse(arg)
+local ok, res = pcall(cli.main, opts, {})
+if not ok then
+  io.stderr:write("liv-bundler: " .. tostring(res) .. "\n")
+  os.exit(1)
+end
+io.write(string.format("vendored %d modules into %s\n", #res.modules, opts.to or "."))
+if #res.external > 0 then
+  io.write("external (not vendored): " .. table.concat(res.external, ", ") .. "\n")
+end
+os.exit(0)

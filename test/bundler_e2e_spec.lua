@@ -47,4 +47,26 @@ describe("bundler end-to-end (L3)", function()
     package.loaded["myplug.vendor.liv.std.buffer"] = nil
     iofs.clean(tmp)
   end)
+
+  it("vendors via cli.main with the path source onto the real filesystem", function()
+    local cli = require("liv.bundler.cli")
+    local root = assert(os.getenv("LIV_ROOT"), "LIV_ROOT not set")
+    local tmp = os.tmpname()
+    os.remove(tmp)
+    tmp = tmp .. ".cliplug"
+
+    local res = cli.main({
+      roots = { "liv.std.buffer" },
+      plugin = "cp",
+      to = tmp,
+      source = "path",
+      from = root .. "/lua",
+    }, {})
+
+    assert.is_true(#res.modules >= 5)
+    -- the lockfile and a rewritten vendored file landed on disk
+    assert.is_true(iofs.exists(tmp .. "/liv.lock"))
+    assert.is_true(iofs.exists(tmp .. "/lua/cp/vendor/liv/std/buffer/init.lua"))
+    iofs.clean(tmp)
+  end)
 end)

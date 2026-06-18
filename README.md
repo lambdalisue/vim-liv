@@ -37,7 +37,7 @@ editor primitive → `liv.core`. The two dev tools each expose a canonical
 
 ## Commands (provided to plugin authors)
 
-- `:LivBundle [module...] [--source=rtp|git|luarock|path]` — vendor modules and
+- `:LivAdd [module...] [--source=rtp|git|luarock|path]` — vendor modules and
   their transitive dependencies; write the lockfile.
 - `:LivUpdate [module...]` — re-vendor to newer versions and show migration
   notices for affected modules.

@@ -42,4 +42,11 @@ function M.clean(dir)
   os.execute("rm -rf " .. shquote(dir))
 end
 
+-- Run a shell command; returns whether it succeeded (normalizes 5.1's exit code
+-- and 5.2+'s boolean). Used by the git source.
+function M.exec(cmd)
+  local ok = os.execute(cmd)
+  return ok == true or ok == 0
+end
+
 return M

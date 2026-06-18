@@ -13,7 +13,7 @@ entry**, a Lua `liv.<tool>.cli.main(args)`. Everything else is a thin shim over 
 This keeps one implementation, makes standalone/CI use first-class, and means the
 editor commands and the terminal CLI can never drift. Some inputs are only
 available in one shim (e.g. `--source=rtp` needs a running editor's
-`&runtimepath`, so it is meaningful from `:LivBundle` but not the standalone
+`&runtimepath`, so it is meaningful from `:LivAdd` but not the standalone
 binary); such cases are noted per option rather than duplicated in logic.
 
 ## Commands
@@ -22,10 +22,15 @@ binary); such cases are noted per option rather than duplicated in logic.
 
 | command | role |
 | --- | --- |
-| `:LivBundle [module...] [--source=rtp\|git\|luarock\|path] [--from=...] [--ref=...] [--to=dir]` | Vendor module(s) + transitive deps; rewrite namespaces; write lockfile. No args = rebuild from lockfile. `:LivBundle liv.lua.async` = that subtree only (minimal, vitalizer parity). |
-| `:LivUpdate [module...]` | Re-vendor to newer versions (per each module's recorded source); show **migration notices** for affected modules ([0008](0008-bundler.md)); confirm; update lockfile. |
-| `:LivCheck` | Read-only: doctor (`+lua`? `git`?) + drift (vendor tree vs lockfile) + outdated report. |
-| `:LivRemove module...` | Remove module(s) and now-unused dependencies; update lockfile (vitalizer's `-Module`). |
+| `:LivAdd <module>... [--source=rtp\|git\|path] [--from=...] [--ref=...] [--to=dir] --plugin=name` | Add module(s) to the bundle — the **union** with the lockfile's existing roots — plus their transitive deps; rewrite namespaces; vendor `.vim` companions; write the lockfile. `:LivAdd liv.lua.async` adds just that subtree. |
+| `:LivUpdate [module...]` | Re-vendor to the current source (**no args = re-vendor ALL bundled roots**); show **migration notices** for affected modules ([0008](0008-bundler.md)); update the lockfile. |
+| `:LivCheck` | Read-only: report drift (source content vs the lockfile hash) and modules missing from the vendor tree. |
+| `:LivRemove <module>...` | Remove module(s) and now-unused dependencies (re-vendor the remaining roots); update the lockfile (vitalizer's `-Module`). |
+
+`:LivAdd` / `:LivUpdate` / `:LivRemove` complete their module arguments from
+`liv.bundler.list` (bundle-able modules discovered on `&runtimepath`, each tagged
+bundled / not-yet-bundled): Add offers not-yet-bundled modules, Update/Remove offer
+the already-bundled roots.
 
 ### Tester (`liv.tester.cli`; shims `bin/liv-tester`, `:LivTest`)
 
@@ -47,7 +52,7 @@ source.
 
 - **`rtp` (default; in-editor only)** — resolve from `&runtimepath`'s `lua/` and
   vendor. Vim globs `runtimepath`; Neovim resolves natively. `liv.core`/`liv.std`
-  are on `runtimepath` once `vim-liv` is installed, so `:LivBundle liv.lua.async`
+  are on `runtimepath` once `vim-liv` is installed, so `:LivAdd liv.lua.async`
   just works. If the resolved source dir is a git checkout, its sha is recorded.
 - **`git`** — `--from=URL --ref=...`: fetch then vendor; pin the ref.
 - **`luarock`** — third-party pure-Lua libs (optional; later).

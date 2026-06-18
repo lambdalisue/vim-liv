@@ -34,7 +34,16 @@ function M.vendor(opts)
 
   fs.clean(vendor_root) -- clean reinstall: never leave a stale vendored module
 
-  local lock = { modules = {} }
+  local lock = {
+    meta = {
+      plugin = opts.plugin,
+      source = opts.source or "path",
+      from = opts.from,
+      ref = opts.ref,
+      roots = opts.roots,
+    },
+    modules = {},
+  }
   for _, name in ipairs(closure.modules) do
     local relpath = resolver.locate(name)
     local content = resolver.read(name)

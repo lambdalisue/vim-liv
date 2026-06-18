@@ -10,10 +10,16 @@ if exists('g:loaded_liv')
 endif
 let g:loaded_liv = 1
 
-" :LivBundle <module>... [--source=rtp|path] [--from=dir] [--to=dir] --plugin=name
-"   No args beyond modules uses the rtp source (resolve from &runtimepath).
-command! -nargs=+ LivBundle call s:liv_bundle(<q-args>)
+"   :LivAdd <module>... [--source=rtp|path|git] [--from=...] [--ref=...] [--to=...] --plugin=name
+"                             add modules to the bundle (union with the lockfile)
+"   :LivUpdate [module...]    re-vendor (rebuild from the lockfile when no args)
+"   :LivCheck                 report drift / missing vs the lockfile (read-only)
+"   :LivRemove <module>...    drop modules and now-unused deps
+command! -nargs=+ LivAdd    call s:liv('add',    <q-args>)
+command! -nargs=* LivUpdate call s:liv('update', <q-args>)
+command! -nargs=* LivCheck  call s:liv('check',  <q-args>)
+command! -nargs=+ LivRemove call s:liv('remove', <q-args>)
 
-function! s:liv_bundle(args) abort
-  call luaeval('require("liv.bundler.cli")._command(_A[1], _A[2])', [a:args, &runtimepath])
+function! s:liv(cmd, args) abort
+  call luaeval('require("liv.bundler.cli")._command(_A[1], _A[2], _A[3])', [a:cmd, a:args, &runtimepath])
 endfunction

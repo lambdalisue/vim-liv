@@ -15,11 +15,29 @@ let g:loaded_liv = 1
 "   :LivUpdate [module...]    re-vendor (rebuild from the lockfile when no args)
 "   :LivCheck                 report drift / missing vs the lockfile (read-only)
 "   :LivRemove <module>...    drop modules and now-unused deps
-command! -nargs=+ LivAdd    call s:liv('add',    <q-args>)
-command! -nargs=* LivUpdate call s:liv('update', <q-args>)
-command! -nargs=* LivCheck  call s:liv('check',  <q-args>)
-command! -nargs=+ LivRemove call s:liv('remove', <q-args>)
+command! -nargs=+ -complete=customlist,<SID>complete_add    LivAdd    call s:liv('add',    <q-args>)
+command! -nargs=* -complete=customlist,<SID>complete_update LivUpdate call s:liv('update', <q-args>)
+command! -nargs=0                                           LivCheck  call s:liv('check',  <q-args>)
+command! -nargs=+ -complete=customlist,<SID>complete_remove LivRemove call s:liv('remove', <q-args>)
 
 function! s:liv(cmd, args) abort
   call luaeval('require("liv.bundler.cli")._command(_A[1], _A[2], _A[3])', [a:cmd, a:args, &runtimepath])
+endfunction
+
+" Completion: enumerate bundle-able liv modules on &runtimepath and the lockfile,
+" then let the Lua side filter by command (add = not-yet-bundled; update/remove =
+" already-bundled) and the typed prefix.
+function! s:liv_complete(cmd, arglead) abort
+  let l:paths = globpath(&runtimepath, 'lua/liv/**/*.lua', 0, 1)
+  let l:lock = filereadable('liv.lock') ? join(readfile('liv.lock'), "\n") : ''
+  return luaeval('require("liv.bundler.cli")._complete(_A[1], _A[2], _A[3], _A[4])', [a:cmd, a:arglead, l:paths, l:lock])
+endfunction
+function! s:complete_add(arglead, cmdline, pos) abort
+  return s:liv_complete('add', a:arglead)
+endfunction
+function! s:complete_update(arglead, cmdline, pos) abort
+  return s:liv_complete('update', a:arglead)
+endfunction
+function! s:complete_remove(arglead, cmdline, pos) abort
+  return s:liv_complete('remove', a:arglead)
 endfunction

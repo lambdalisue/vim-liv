@@ -9,6 +9,7 @@
 local vendor = require("liv.bundler.vendor")
 local lockfile = require("liv.bundler.lockfile")
 local migrate = require("liv.bundler.migrate")
+local list = require("liv.bundler.list")
 local path = require("liv.bundler.source.path")
 local rtp = require("liv.bundler.source.rtp")
 local git = require("liv.bundler.source.git")
@@ -289,6 +290,37 @@ function M._command(command, argstr, runtimepath)
     print("liv: external (not vendored): " .. table.concat(res.external, ", "))
   end
   return res
+end
+
+-- Argument completion for the :Liv* commands. The shim enumerates the candidate
+-- lua files (globpath over &runtimepath) and reads the lockfile; this maps them to
+-- bundle-able module names tagged bundled/not, then filters by command — add
+-- offers not-yet-bundled modules, update/remove offer the bundled roots — and by
+-- the typed prefix. Editor-independent (paths + lock text are passed in).
+---@param command string "add" | "update" | "remove"
+---@param arglead string the partial argument being completed
+---@param paths string[] absolute paths to candidate lua files
+---@param lock_text string? the lockfile contents (may be empty)
+---@return string[] candidates
+function M._complete(command, arglead, paths, lock_text)
+  local relpaths = {}
+  for _, p in ipairs(paths or {}) do
+    relpaths[#relpaths + 1] = p:match(".*/lua/(.+)$") or p
+  end
+  local roots = {}
+  if lock_text and lock_text ~= "" then
+    for _, r in ipairs(lockfile.parse(lock_text).meta.roots or {}) do
+      roots[r] = true
+    end
+  end
+  local want_bundled = command == "remove" or command == "update"
+  local out = {}
+  for _, item in ipairs(list.list(relpaths, roots)) do
+    if item.bundled == want_bundled and (arglead == "" or item.name:sub(1, #arglead) == arglead) then
+      out[#out + 1] = item.name
+    end
+  end
+  return out
 end
 
 return M

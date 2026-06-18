@@ -154,3 +154,25 @@ describe("liv.bundler.cli.update", function()
     assert.equal("2.0.0", res.notices[1].version)
   end)
 end)
+
+describe("liv.bundler.cli._complete", function()
+  local paths = {
+    "/rtp/lua/liv/core.lua",
+    "/rtp/lua/liv/std/buffer/init.lua",
+    "/rtp/lua/liv/std/window/init.lua",
+  }
+  local lock = lockfile.serialize({
+    meta = { plugin = "mp", source = "rtp", roots = { "liv.std.buffer" } },
+    modules = {},
+  })
+
+  it("offers not-yet-bundled modules to add (filtered by prefix)", function()
+    -- buffer is bundled, window is not; core does not match the "liv.std" prefix
+    assert.same({ "liv.std.window" }, cli._complete("add", "liv.std", paths, lock))
+  end)
+
+  it("offers the bundled roots to remove/update", function()
+    assert.same({ "liv.std.buffer" }, cli._complete("remove", "", paths, lock))
+    assert.same({ "liv.std.buffer" }, cli._complete("update", "", paths, lock))
+  end)
+end)

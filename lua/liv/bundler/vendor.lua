@@ -29,21 +29,36 @@ function M.vendor(opts)
   local plugin_path = (opts.plugin:gsub("%.", "/"))
   local vendor_root = opts.target .. "/lua/" .. plugin_path .. "/vendor"
 
-  local closure = analyze.closure(opts.roots, resolver.read)
+  local closure = analyze.closure(opts.roots, resolver.read, resolver.manifest)
   local vendored = rewrite.name_set(closure.modules)
 
   fs.clean(vendor_root) -- clean reinstall: never leave a stale vendored module
 
   local lock = { modules = {} }
   for _, name in ipairs(closure.modules) do
+    local relpath = resolver.locate(name)
     local content = resolver.read(name)
-    local rewritten = rewrite.rewrite(content, vendored, prefix)
-    fs.write(vendor_root .. "/" .. resolver.locate(name), rewritten)
+    fs.write(vendor_root .. "/" .. relpath, rewrite.rewrite(content, vendored, prefix))
     lock.modules[name] = {
       source = opts.source or "path",
       version = opts.version,
       hash = lockfile.hash(content),
     }
+
+    -- Copy declared companion files (e.g. a Vim 9 `.vim`) beside the module,
+    -- verbatim — they are not Lua, so requires are not rewritten. The companion
+    -- path is relative to the module's directory.
+    local files = closure.companions[name]
+    if files then
+      local dir = relpath:match("^(.*)/[^/]+$") or ""
+      for _, comp in ipairs(files) do
+        local rel = (dir ~= "" and (dir .. "/") or "") .. (comp:gsub("^%./", ""))
+        local raw = resolver.read_raw(rel)
+        if raw then
+          fs.write(vendor_root .. "/" .. rel, raw)
+        end
+      end
+    end
   end
   fs.write(opts.target .. "/liv.lock", lockfile.serialize(lock))
 

@@ -69,4 +69,44 @@ describe("bundler end-to-end (L3)", function()
     assert.is_true(iofs.exists(tmp .. "/lua/cp/vendor/liv/std/buffer/init.lua"))
     iofs.clean(tmp)
   end)
+
+  it("vendors a module's Vim 9 companion and runs it in isolation", function()
+    local root = assert(os.getenv("LIV_ROOT"), "LIV_ROOT not set")
+    local tmp = os.tmpname()
+    os.remove(tmp)
+    tmp = tmp .. ".cmdplug"
+
+    -- liv.std.command pulls liv.std._dispatch, whose .vim is declared in a manifest
+    local resolver = pathsrc.resolver(root .. "/lua", iofs)
+    vendor.vendor({
+      roots = { "liv.std.command" },
+      resolver = resolver,
+      fs = iofs,
+      target = tmp,
+      plugin = "cmdp",
+      source = "path",
+    })
+    -- the Vim 9 companion was copied beside the vendored _dispatch.lua
+    assert.is_true(iofs.exists(tmp .. "/lua/cmdp/vendor/liv/std/_dispatch.vim"))
+
+    -- load the vendored command in isolation (on Vim this sources the vendored .vim
+    -- via _dispatch's own debug.getinfo path — proving the companion is in place)
+    local saved = package.path
+    package.path = tmp .. "/lua/?.lua;" .. tmp .. "/lua/?/init.lua"
+    local ok, command = pcall(require, "cmdp.vendor.liv.std.command")
+    package.path = saved
+    assert.is_true(ok, "requiring the vendored command failed: " .. tostring(command))
+
+    -- the vendored command actually defines and fires a user command
+    local fired = false
+    command.define("LivVendoredCmd", function()
+      fired = true
+    end)
+    core.cmd("LivVendoredCmd")
+    assert.is_true(fired)
+    command.remove("LivVendoredCmd")
+
+    package.loaded["cmdp.vendor.liv.std.command"] = nil
+    iofs.clean(tmp)
+  end)
 end)

@@ -52,4 +52,55 @@ describe("liv.bundler.vendor", function()
     -- a lockfile was written at the plugin root
     assert.is_not_nil(files["/tmp/mp/liv.lock"])
   end)
+
+  it("copies a declared companion file verbatim beside its module", function()
+    local sources = {
+      ["liv.std.command"] = 'local d = require("liv.std._dispatch")',
+      ["liv.std._dispatch"] = "-- dispatch",
+    }
+    local relpaths = {
+      ["liv.std.command"] = "liv/std/command/init.lua",
+      ["liv.std._dispatch"] = "liv/std/_dispatch.lua",
+    }
+    local manifests = { ["liv.std._dispatch"] = { files = { "_dispatch.vim" } } }
+    local raws = { ["liv/std/_dispatch.vim"] = "vim9script\n# companion" }
+    local files = {}
+    local fs = {
+      write = function(p, c)
+        files[p] = c
+      end,
+      clean = function() end,
+    }
+    local resolver = {
+      read = function(n)
+        return sources[n]
+      end,
+      locate = function(n)
+        return relpaths[n]
+      end,
+      manifest = function(n)
+        return manifests[n]
+      end,
+      read_raw = function(rel)
+        return raws[rel]
+      end,
+    }
+
+    vendor.vendor({
+      roots = { "liv.std.command" },
+      resolver = resolver,
+      fs = fs,
+      target = "/t",
+      plugin = "mp",
+      source = "path",
+    })
+
+    -- the .vim was copied verbatim (no require rewriting) beside the vendored .lua
+    assert.equal("vim9script\n# companion", files["/t/lua/mp/vendor/liv/std/_dispatch.vim"])
+    -- and command's require was rewritten as usual
+    assert.equal(
+      'local d = require("mp.vendor.liv.std._dispatch")',
+      files["/t/lua/mp/vendor/liv/std/command/init.lua"]
+    )
+  end)
 end)

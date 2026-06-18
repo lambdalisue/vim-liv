@@ -33,4 +33,16 @@ describe("liv.bundler.source.path", function()
     assert.is_nil(r.locate("liv.nope"))
     assert.is_nil(r.read("liv.nope"))
   end)
+
+  it("reads a sibling .deps.lua manifest and arbitrary files via read_raw", function()
+    local fs2 = mockfs({
+      ["/src/liv/std/_dispatch.lua"] = "DISPATCH",
+      ["/src/liv/std/_dispatch.deps.lua"] = 'return { files = { "_dispatch.vim" } }',
+      ["/src/liv/std/_dispatch.vim"] = "VIM9",
+    })
+    local r2 = path.resolver("/src", fs2)
+    assert.same({ files = { "_dispatch.vim" } }, r2.manifest("liv.std._dispatch"))
+    assert.equal("VIM9", r2.read_raw("liv/std/_dispatch.vim"))
+    assert.is_nil(r2.manifest("liv.std.nomanifest"))
+  end)
 end)

@@ -51,16 +51,21 @@ end
 ---@class liv.bundler.analyze.Closure
 ---@field modules string[] Sorted resolvable module names (incl. roots).
 ---@field external string[] Sorted unresolvable module names (recorded, not traversed).
+---@field companions table<string, string[]> module name -> its declared companion files.
 
--- Compute the transitive closure of modules reachable from `roots`.
+-- Compute the transitive closure of modules reachable from `roots`. Traversal
+-- follows static literal `require`s AND, when a `manifest` reader is given, each
+-- module's dependency manifest: `manifest(name)` -> { modules?, files? } (or nil).
+-- `modules` are dynamic deps (not literal requires) added to the traversal;
+-- `files` are non-Lua companions (e.g. a Vim 9 `.vim`) recorded per module so the
+-- vendorer copies them beside the module.
 --   resolve(name) -> source string, or nil if the module cannot be resolved.
--- Returns { modules = <sorted resolvable set incl. roots>,
---           external = <sorted unresolvable set, recorded but not traversed> }.
 ---@param roots string[] Module names to start traversal from.
 ---@param resolve fun(name: string): string? Resolve a module name to its source, or nil.
+---@param manifest? fun(name: string): { modules?: string[], files?: string[] }?
 ---@return liv.bundler.analyze.Closure closure The transitive dependency closure.
-function M.closure(roots, resolve)
-  local seen, external = {}, {}
+function M.closure(roots, resolve, manifest)
+  local seen, external, companions = {}, {}, {}
   local queue = {}
   for _, r in ipairs(roots) do
     queue[#queue + 1] = r
@@ -78,10 +83,21 @@ function M.closure(roots, resolve)
             queue[#queue + 1] = dep
           end
         end
+        local m = manifest and manifest(name)
+        if m then
+          if m.files then
+            companions[name] = m.files
+          end
+          for _, dyn in ipairs(m.modules or {}) do
+            if not seen[dyn] then
+              queue[#queue + 1] = dyn
+            end
+          end
+        end
       end
     end
   end
-  return { modules = sorted_keys(seen), external = sorted_keys(external) }
+  return { modules = sorted_keys(seen), external = sorted_keys(external), companions = companions }
 end
 
 return M

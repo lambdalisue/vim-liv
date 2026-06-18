@@ -42,6 +42,12 @@ function M.resolver(roots, fs)
     read = function(name)
       return first("read", name)
     end,
+    read_raw = function(rel)
+      return first("read_raw", rel)
+    end,
+    manifest = function(name)
+      return first("manifest", name)
+    end,
   }
 end
 

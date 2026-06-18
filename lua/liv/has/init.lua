@@ -1,0 +1,33 @@
+-- liv.has — capability detection (spec 0002, 0006). A single callable so plugin
+-- authors branch intentionally on power features instead of failing silently:
+-- `if require("liv.has")("mark.virt_text") then ... end`. Editor-dependent (the
+-- answers differ per editor and per Vim version), so it selects a backend once at
+-- import. An unknown feature reports false (not available), never an error, so new
+-- feature keys stay forward-compatible.
+--
+-- Known features:
+--   "async"          — cooperative async runner (both editors)
+--   "popup"          — floating/popup windows (both editors)
+--   "popup.border"   — bordered popups (both editors)
+--   "mark"           — text decoration via marks (Neovim extmark / Vim textprop)
+--   "mark.virt_text" — virtual text on marks (Neovim always / Vim 9.0+ textprop)
+--   "mark.range"     — intra-line column-range highlight (Neovim always / Vim textprop)
+--   "highlight"      — define/update a named highlight group (both editors)
+--   "fs.async"       — true async filesystem (Neovim libuv only; Vim is sync)
+--   "process.stream" — streaming line-oriented spawn via process.open (both editors)
+--   "fetch"          — HTTP(S) fetch via an external curl/wget being installed
+---@alias liv.feature
+---| "async"
+---| "popup"
+---| "popup.border"
+---| "mark"
+---| "mark.virt_text"
+---| "mark.range"
+---| "highlight"
+---| "fs.async"
+---| "process.stream"
+---| "fetch"
+local core = require("liv.core")
+
+---@type fun(feature: liv.feature|string): boolean
+return (core.is_nvim and require("liv.has._nvim") or require("liv.has._vim"))(core)

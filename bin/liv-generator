@@ -1,0 +1,44 @@
+#!/usr/bin/env luajit
+-- liv-generator — regenerate the typed, version-pinned editor bindings from
+-- Vim/Neovim docs (the liv.generator dev tool; à la @denops/std's gen scripts).
+-- Downloads each editor's runtime/doc at the pinned versions, parses, and writes
+-- the committed generated files. Run from anywhere:  /path/to/vim-liv/bin/liv-generator
+local here = arg[0]:match("^(.*)/[^/]+$") or "."
+local root = io.popen("cd '" .. here .. "/..' && pwd"):read("*l")
+package.path = root .. "/lua/?.lua;" .. root .. "/lua/?/init.lua;" .. package.path
+
+local versions = require("liv.generator.supported_versions")
+local parse = require("liv.generator.option.parse")
+local generate = require("liv.generator.option.generate")
+
+local function download(url)
+  local pipe = io.popen("curl -fsSL '" .. url .. "'")
+  local body = pipe:read("*a")
+  local ok = pipe:close()
+  if not ok or body == "" then
+    error("download failed: " .. url)
+  end
+  return body
+end
+
+local function doc_url(host, version, file)
+  return string.format("https://raw.githubusercontent.com/%s/v%s/runtime/doc/%s", host, version, file)
+end
+
+io.write(string.format("liv-generator: vim %s, neovim %s\n", versions.vim, versions.neovim))
+
+io.write("downloading options.txt ...\n")
+local vim_defs = parse(download(doc_url("vim/vim", versions.vim, "options.txt")))
+local nvim_defs = parse(download(doc_url("neovim/neovim", versions.neovim, "options.txt")))
+io.write(string.format("  parsed: vim=%d, neovim=%d options\n", #vim_defs, #nvim_defs))
+
+local files = generate(vim_defs, nvim_defs)
+for relpath, content in pairs(files) do
+  local path = root .. "/" .. relpath
+  os.execute("mkdir -p '" .. path:match("^(.*)/[^/]+$") .. "'")
+  local f = assert(io.open(path, "w"))
+  f:write(content)
+  f:close()
+  io.write("  wrote " .. relpath .. "\n")
+end
+io.write("done\n")

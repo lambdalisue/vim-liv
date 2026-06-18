@@ -8,8 +8,10 @@ NOT polyfill or mirror Neovim's API.
 - **Never mimic Neovim's API names or shapes**: `nvim_*`, `vim.api.*`, `extmark`,
   `vim.uv`, `vim.schedule`, `vim.keymap.set`. "Similar but different" creates
   false familiarity and silent bugs. **Different behavior → different name.**
-- **Domain vocabulary is fine** (buffer, window, tabpage, option, autocmd-as
-  `event`): these are editor-shared concepts, not Neovim-specific coinages.
+- **Domain vocabulary is fine** (buffer, window, tabpage, option, autocmd):
+  these are editor-shared concepts, not Neovim-specific coinages. Prefer the real
+  domain word — `autocmd` (`:autocmd` is an Ex command on both editors) reads
+  clearer than an invented synonym like `event`.
 - Shape APIs from liv's own coherent model: `liv.std.<area>.<verb>`.
 
 ## Conventions (documented loudly; all APIs follow them)

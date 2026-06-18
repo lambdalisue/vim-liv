@@ -8,8 +8,10 @@ local root = io.popen("cd '" .. here .. "/..' && pwd"):read("*l")
 package.path = root .. "/lua/?.lua;" .. root .. "/lua/?/init.lua;" .. package.path
 
 local versions = require("liv.generator.supported_versions")
-local parse = require("liv.generator.option.parse")
-local generate = require("liv.generator.option.generate")
+local opt_parse = require("liv.generator.option.parse")
+local opt_generate = require("liv.generator.option.generate")
+local fn_parse = require("liv.generator.function.parse")
+local fn_generate = require("liv.generator.function.generate")
 
 local function download(url)
   local pipe = io.popen("curl -fsSL '" .. url .. "'")
@@ -27,18 +29,27 @@ end
 
 io.write(string.format("liv-generator: vim %s, neovim %s\n", versions.vim, versions.neovim))
 
-io.write("downloading options.txt ...\n")
-local vim_defs = parse(download(doc_url("vim/vim", versions.vim, "options.txt")))
-local nvim_defs = parse(download(doc_url("neovim/neovim", versions.neovim, "options.txt")))
-io.write(string.format("  parsed: vim=%d, neovim=%d options\n", #vim_defs, #nvim_defs))
-
-local files = generate(vim_defs, nvim_defs)
-for relpath, content in pairs(files) do
-  local path = root .. "/" .. relpath
-  os.execute("mkdir -p '" .. path:match("^(.*)/[^/]+$") .. "'")
-  local f = assert(io.open(path, "w"))
-  f:write(content)
-  f:close()
-  io.write("  wrote " .. relpath .. "\n")
+local function write_all(files)
+  for relpath, content in pairs(files) do
+    local path = root .. "/" .. relpath
+    os.execute("mkdir -p '" .. path:match("^(.*)/[^/]+$") .. "'")
+    local f = assert(io.open(path, "w"))
+    f:write(content)
+    f:close()
+    io.write("  wrote " .. relpath .. "\n")
+  end
 end
+
+io.write("downloading options.txt ...\n")
+local vim_opts = opt_parse(download(doc_url("vim/vim", versions.vim, "options.txt")))
+local nvim_opts = opt_parse(download(doc_url("neovim/neovim", versions.neovim, "options.txt")))
+io.write(string.format("  parsed: vim=%d, neovim=%d options\n", #vim_opts, #nvim_opts))
+write_all(opt_generate(vim_opts, nvim_opts))
+
+io.write("downloading builtin.txt ...\n")
+local vim_fns = fn_parse(download(doc_url("vim/vim", versions.vim, "builtin.txt")))
+local nvim_fns = fn_parse(download(doc_url("neovim/neovim", versions.neovim, "builtin.txt")))
+io.write(string.format("  parsed: vim=%d, neovim=%d functions\n", #vim_fns, #nvim_fns))
+write_all(fn_generate(vim_fns, nvim_fns))
+
 io.write("done\n")

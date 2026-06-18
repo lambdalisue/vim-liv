@@ -1,0 +1,82 @@
+-- L1 unit test for the compat shim (Axis A: Lua 5.1-5.4 / LuaJIT differences).
+local compat = require("liv.lua.compat")
+
+describe("liv.lua.compat.unpack / pack", function()
+  it("unpacks a sequence like the version-appropriate unpack", function()
+    local a, b, c = compat.unpack({ 1, 2, 3 })
+    assert.equal(1, a)
+    assert.equal(2, b)
+    assert.equal(3, c)
+  end)
+
+  it("unpacks an explicit i..j range", function()
+    local a, b = compat.unpack({ 1, 2, 3, 4 }, 2, 3)
+    assert.equal(2, a)
+    assert.equal(3, b)
+  end)
+
+  it("packs varargs with an n field (including nils)", function()
+    local t = compat.pack(1, nil, 3)
+    assert.equal(3, t.n)
+    assert.equal(1, t[1])
+    assert.equal(3, t[3])
+  end)
+end)
+
+describe("liv.lua.compat.searchers", function()
+  it("aliases package.searchers / package.loaders", function()
+    assert.is_table(compat.searchers)
+    assert.equal(package.searchers or package.loaders, compat.searchers)
+  end)
+end)
+
+describe("liv.lua.compat bitwise ops", function()
+  it("band masks common bits", function()
+    assert.equal(0x00, compat.band(0xF0, 0x0F))
+    assert.equal(0x0C, compat.band(0xFC, 0x0F))
+  end)
+
+  it("bor unions bits", function()
+    assert.equal(0xFF, compat.bor(0xF0, 0x0F))
+    assert.equal(0xF0, compat.bor(0xA0, 0x50))
+  end)
+
+  it("bxor toggles bits", function()
+    assert.equal(0xF0, compat.bxor(0xFF, 0x0F))
+    assert.equal(0x00, compat.bxor(0xAA, 0xAA))
+  end)
+
+  it("lshift / rshift scale by powers of two", function()
+    assert.equal(16, compat.lshift(1, 4))
+    assert.equal(1, compat.rshift(16, 4))
+    assert.equal(0, compat.rshift(1, 4))
+  end)
+
+  it("bnot inverts within 32 bits", function()
+    assert.equal(0xFFFFFFFF, compat.bnot(0))
+    assert.equal(0, compat.bnot(0xFFFFFFFF))
+  end)
+end)
+
+describe("liv.lua.compat numeric helpers", function()
+  it("pow raises to a power", function()
+    assert.equal(1024, compat.pow(2, 10))
+  end)
+
+  it("idiv floors the quotient", function()
+    assert.equal(3, compat.idiv(7, 2))
+    assert.equal(-4, compat.idiv(-7, 2))
+  end)
+
+  it("is_integer detects integrality without 5.3 math.type", function()
+    assert.is_true(compat.is_integer(3))
+    assert.is_true(compat.is_integer(-10))
+    assert.is_false(compat.is_integer(3.5))
+  end)
+
+  it("atan2 respects quadrant signs", function()
+    -- atan2(1, 1) is +pi/4; atan2(-1, -1) is -3pi/4. Just check the signs.
+    assert.is_true(compat.atan2(1, 1) > 0)
+    assert.is_true(compat.atan2(-1, -1) < 0)
+  end)
+end)

@@ -1,0 +1,212 @@
+*liv.txt*	Write Lua plugins that run on both Vim 9 and Neovim, deps bundled
+
+				*liv*
+	liv = L(ua) + I(nterop) + V(im) — and the Nordic word for "life",
+	inheriting vital.vim's spirit. You write one Lua source against liv's
+	cross-editor API; liv is vendored into your plugin, so your users
+	install only your plugin — never liv, never anything else.
+
+	This help is for PLUGIN AUTHORS using liv. liv's own internal design
+	lives under `.claude/specs/` (see |liv-internals|).
+
+==============================================================================
+CONTENTS						*liv-contents*
+
+	1. Why liv ................. |liv-why|
+	2. Requirements ............ |liv-requirements|
+	3. Workflow ................ |liv-workflow|
+	4. Writing a plugin ........ |liv-writing|
+	5. The API ................. |liv-api|
+	6. Conventions ............. |liv-conventions|
+	7. Capabilities ............ |liv-capabilities|
+	8. Commands ................ |liv-commands|
+	9. Testing ................. |liv-testing|
+	10. Internals .............. |liv-internals|
+
+==============================================================================
+1. Why liv					*liv-why*
+
+You want your Lua plugin to work on both Vim 9 (compiled with |+lua|) and
+Neovim, and you want your users to install just your plugin. liv gives you:
+
+- One cross-editor API (|liv.std|, |liv.lua|) instead of branching on
+  `has('nvim')` and re-learning each editor's quirks.
+- A build step (|:LivAdd|) that copies liv into YOUR plugin under a private
+  namespace, so there is no separate "install liv first" step for users.
+- Honesty about editor differences: everything in the contract works on both
+  editors; power features are gated by |liv.has()| so you opt in on purpose.
+
+liv owns its own stable contract: everything in it is guaranteed to work on
+both editors. It deliberately does NOT copy Neovim's API names or shapes —
+"similar but different" hides bugs.
+
+==============================================================================
+2. Requirements					*liv-requirements*
+
+- Your users need Vim 9 with |+lua|, OR Neovim. (A Vim without |+lua| cannot
+  run liv.)
+- You, the author, need `vim-liv` installed while developing, plus `git` for
+  the `git` source, and `curl`/`wget` if you use |liv.std.fetch|.
+
+==============================================================================
+3. Workflow					*liv-workflow*
+
+The author journey is develop -> test -> bundle -> ship: >
+
+	1. Install vim-liv (so :Liv* and the liv.* modules are available).
+
+	2. In your plugin, vendor the liv modules you use:
+	     :LivAdd liv.std.buffer liv.std.map --plugin=myplugin
+	   This creates lua/myplugin/vendor/liv/... and liv.lock.
+
+	3. Write your plugin against the VENDORED path (see |liv-writing|),
+	   require("myplugin.vendor.liv.std.map"), and test with
+	   bin/liv-tester (see |liv-testing|).
+
+	4. Add more modules any time (it is additive): :LivAdd liv.std.fs
+	   Update them later with :LivUpdate; check with :LivCheck.
+
+	5. Commit lua/myplugin/vendor/ and liv.lock. Ship. Your users install
+	   only myplugin.
+<
+The vendored copy is self-contained: liv's internal requires are rewritten to
+`myplugin.vendor.liv.*`, so two plugins that each vendor liv never collide.
+
+==============================================================================
+4. Writing a plugin				*liv-writing*
+
+Require the vendored modules under your own prefix and use liv's API. A small
+example (lua/myplugin/init.lua): >
+
+	local map     = require("myplugin.vendor.liv.std.map")
+	local buffer  = require("myplugin.vendor.liv.std.buffer")
+	local autocmd = require("myplugin.vendor.liv.std.autocmd")
+
+	-- a mapping whose rhs is a plain Lua function (both editors)
+	map.set("n", "<leader>r", function()
+	  buffer.set_lines(0, 1, buffer.count(0), { "reset by myplugin" })
+	end)
+
+	-- react to an event; the handler gets a context table
+	local sub = autocmd.on("BufWritePost", { pattern = "*.md" },
+	  function(ctx) print("saved " .. ctx.file) end)
+	-- sub.off()  -- to remove it later
+<
+Async work uses |liv.std.task| over the pure |liv.lua.async| engine: >
+
+	local task    = require("myplugin.vendor.liv.std.task")
+	local process = require("myplugin.vendor.liv.std.process")
+
+	task.run(function()
+	  local r = process.system({ "git", "rev-parse", "HEAD" })
+	  print("HEAD is " .. r.stdout)
+	end)
+<
+==============================================================================
+5. The API					*liv-api*
+
+Decide where a thing lives by one question: does it need the editor?
+needs the editor -> |liv.std|; pure computation -> |liv.lua|. |liv.core| is a
+rarely-used escape hatch.
+
+						*liv.std*
+liv.std		Editor-dependent cross-editor API (one backend chosen once at
+		import). Modules: >
+	buffer  window  tabpage  option  var  fn  map  command  autocmd
+	process task    fs       ui      float mark sign  json    fetch
+<
+						*liv.lua*
+liv.lua		Editor-independent pure Lua (deterministic, no editor; safe
+		for a library to depend on). Modules: >
+	compat  async  path  value  msgpack  http  zlib  png
+<
+						*liv.core*
+liv.core	The single seam over the editor: value marshaling and the
+		vimscript bridge. The only module that marshals; advanced use.
+
+						*liv.has*
+liv.has		Capability detection — see |liv-capabilities|.
+
+==============================================================================
+6. Conventions					*liv-conventions*
+
+Every liv API follows these (documented loudly because they differ from
+Neovim's):
+
+- Ranges are 1-based and INCLUSIVE (Lua/Vim native; not 0-based/exclusive).
+- Handles are integer ids (buffer/window/tabpage); `0` or `nil` = current.
+- Positions are `{line, col}`, 1-based.
+- Failures raise via `error()` (pcall-able); async errors propagate through
+  `await`.
+- Callbacks are plain Lua functions passed directly (both editors keep them
+  alive); no manual register step.
+
+==============================================================================
+7. Capabilities					*liv-capabilities*
+
+						*liv.has()*
+liv.has({feature})	Returns whether {feature} is available so you branch on
+			purpose instead of failing silently. Base contract
+			features are true on both editors; power features
+			differ. Known features include: >
+	"async" "float" "float.border" "mark" "mark.virt_text"
+	"fs.async" "fetch" "image" "image.gui"
+<			An unknown feature returns false (never an error), so
+			new keys stay forward-compatible. Example: >
+	if require("myplugin.vendor.liv.has")("mark.virt_text") then
+	  ... -- show virtual text
+	end
+<
+==============================================================================
+8. Commands					*liv-commands*
+
+These are your build-time tools (thin shims over `liv.bundler.cli`; the same
+logic is on the terminal as `bin/liv-bundler`, using a non-`rtp` source).
+
+							*:LivAdd*
+:LivAdd {module}... [--source=rtp|git|path] [--from={x}] [--ref={r}]
+		    [--to={dir}] --plugin={name}
+		Add {module}s (plus their transitive closure and any `.vim`
+		companions) to the bundle — the UNION with the roots already
+		in `liv.lock`, so it adds rather than replaces. Sources: `rtp`
+		(default, resolve from 'runtimepath'), `git` (--from=URL
+		--ref=...), `path` (--from=dir). Completes not-yet-bundled
+		modules.
+
+							*:LivUpdate*
+:LivUpdate [{module}...]
+		Re-vendor to the current source. No arguments re-vendors ALL
+		bundled roots. Shows migration notices for affected modules
+		when versions are known. Completes bundled roots.
+
+							*:LivCheck*
+:LivCheck	Read-only: report modules whose source drifted from the
+		recorded hash, and modules missing from the vendor tree.
+
+							*:LivRemove*
+:LivRemove {module}...
+		Remove {module}s and now-unused dependencies (re-vendor the
+		remaining roots); update `liv.lock`. Completes bundled roots.
+
+==============================================================================
+9. Testing					*liv-testing*
+
+Test your own liv plugin with one command from its root: >
+
+	/path/to/vim-liv/bin/liv-tester
+<
+It runs `spec/` as L1 (editor-free, in-process) and `test/` as L3 (inside real
+Vim +lua AND Neovim, headless), and aggregates the results — no per-project
+runner boilerplate. The framework is busted-shaped (`describe`/`it`) with
+luassert-shaped `assert`.
+
+==============================================================================
+10. Internals					*liv-internals*
+
+liv's normative design — architecture, principles, the marshaling model, the
+|liv.std| catalog, async, the bundler, and the test strategy — lives as
+numbered specs under `.claude/specs/` in the repository (developer-facing, not
+shipped to users). Start at `.claude/specs/0001-overview.md`. You do not need
+any of it to USE liv; it is there if you want to understand or contribute.
+
+ vim:tw=78:ts=8:noet:ft=help:norl:

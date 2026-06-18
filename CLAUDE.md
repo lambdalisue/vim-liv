@@ -10,8 +10,8 @@ in Japanese, but artifacts stay English.)
 A framework for writing Lua plugins that run on **both Vim 9 (`+lua`) and
 Neovim**, where installing only the consumer plugin suffices (deps are bundled).
 
-Read [`docs/specs/`](docs/specs/) before non-trivial work — it is the normative
-source of truth. Start with `docs/specs/0001-overview.md`.
+Read [`.claude/specs/`](.claude/specs/) before non-trivial work — it is the normative
+source of truth. Start with `.claude/specs/0001-overview.md`.
 
 ## Architecture (six namespaces, one monorepo)
 
@@ -26,7 +26,7 @@ Runtime (vendored into consumer plugins):
 Dev tools (pure Lua; **never vendored** — not in a consumer's runtime require graph):
 - `liv.bundler` — build-time bundler.
 - `liv.tester` — cross-editor test framework + runner (`bin/liv-tester`).
-- `liv.generator` — build-time codegen of typed editor-API wrappers (`liv.std.fn`,
+- `liv.generator` — build-time codegen of typed editor-API wrappers (`liv.std.function`,
   `liv.std.option`) + LuaLS annotations from pinned Vim/Neovim docs (`bin/liv-generator`).
 
 Each tool's canonical entry is `liv.<tool>.cli.main`; `bin/` and `:Liv*` are thin

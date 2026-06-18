@@ -1,7 +1,7 @@
 # Migrations
 
 Breaking-change notices, consumed by `:LivUpdate` to warn about changes affecting
-the modules a plugin actually bundles (see `docs/specs/0008-bundler.md`).
+the modules a plugin actually bundles (see `.claude/specs/0008-bundler.md`).
 
 Format: one entry per version, newest first.
 

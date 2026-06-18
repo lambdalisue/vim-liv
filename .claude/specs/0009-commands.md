@@ -42,7 +42,7 @@ the already-bundled roots.
 
 | entry | role |
 | --- | --- |
-| `bin/liv-generator` | Regenerate the typed editor-API wrappers (`liv.std.fn` builtins, `liv.std.option` options) and their LuaLS annotations from the **pinned** Vim/Neovim docs (`liv.generator.supported_versions`). Dev-time only; emits committed source, never runs at a consumer's runtime. |
+| `bin/liv-generator` | Regenerate the typed editor-API wrappers (`liv.std.function` builtins, `liv.std.option` options) and their LuaLS annotations from the **pinned** Vim/Neovim docs (`liv.generator.supported_versions`). Dev-time only; emits committed source, never runs at a consumer's runtime. |
 
 ## `--source` (default `rtp`)
 

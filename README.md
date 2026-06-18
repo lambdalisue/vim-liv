@@ -19,7 +19,7 @@ This single repository (a Vim/Neovim plugin) hosts five namespaces:
   that touches `vim.*`), plus bidirectional value marshaling. Vendored into
   consumer plugins. (A rarely-used escape hatch for authors.)
 - **`liv.std`** — liv's own, stable, **editor-dependent** cross-editor API surface
-  (buffer, window, event, map, process, fs, ui, float, mark, …), named by purpose.
+  (buffer, window, autocmd, mapping, process, fs, ui, popup, mark, bufname, …), named by purpose.
   Vendored into consumer plugins.
 - **`liv.lua`** — **editor-independent** pure-Lua modules (`liv.lua.compat`,
   `liv.lua.async`, `liv.lua.path`, …): deterministic on every host, safe for a
@@ -46,7 +46,7 @@ editor primitive → `liv.core`. The two dev tools each expose a canonical
 
 ## Design
 
-See [`docs/specs/`](docs/specs/) for the normative specifications.
+See [`.claude/specs/`](.claude/specs/) for the normative specifications.
 
 ## Requirements
 

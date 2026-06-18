@@ -1,7 +1,7 @@
 # Rule: SPEC + TDD
 
 Follow Kent Beck's TDD: write a failing test first, make it pass, refactor.
-The spec under `docs/specs/` is the contract; tests encode it.
+The spec under `.claude/specs/` is the contract; tests encode it.
 
 ## Test layers
 

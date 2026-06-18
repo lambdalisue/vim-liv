@@ -38,7 +38,7 @@ vim-liv/
     generator/              # liv.generator.* (typed-wrapper codegen; never vendored)
   spec/                     # L1 (no real editor; run in-process)
   test/                     # L3 (real Vim + Neovim, headless)
-  docs/specs/
+  .claude/specs/
 ```
 
 ## Where does a module go? (placement rule)

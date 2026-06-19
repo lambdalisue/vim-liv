@@ -1,0 +1,34 @@
+-- liv.std.highlight — define or update a NAMED highlight group cross-editor
+-- (spec 0006). The typical caller colors terminal cells from a pty bridge's
+-- per-cell attributes: derive a stable group name from the attribute tuple, call
+-- set() once, then reference the group from liv.std.mark.
+--
+-- Colors (fg/bg/sp) accept either an integer 0xRRGGBB or a "#rrggbb" string; an
+-- integer is converted to "#%06x" so both backends take a single string code
+-- path. Attribute booleans cover the styles both editors expose as highlight
+-- attributes. `blink` and `dim` are accepted for API symmetry with terminal SGR
+-- but have no editor highlight-attribute equivalent, so they are silently
+-- ignored on both editors.
+--
+-- GUI colors require true-color: Neovim renders them whenever termguicolors is
+-- on (and natively in GUIs); on Vim the caller must enable 'termguicolors' for
+-- guifg/guibg to take effect in a terminal. The boolean attributes are mirrored
+-- into the cterm form as well, so they still render in 256-color terminals.
+---@class liv.std.highlight.attrs
+---@field fg? integer|string foreground 0xRRGGBB or "#rrggbb"
+---@field bg? integer|string background 0xRRGGBB or "#rrggbb"
+---@field sp? integer|string special (underline) color 0xRRGGBB or "#rrggbb"
+---@field bold? boolean
+---@field italic? boolean
+---@field underline? boolean
+---@field undercurl? boolean
+---@field reverse? boolean
+---@field strikethrough? boolean
+---@field blink? boolean accepted but ignored (no editor equivalent)
+---@field dim? boolean accepted but ignored (no editor equivalent)
+---@class liv.std.highlight
+---@field set fun(name: string, attrs: liv.std.highlight.attrs)
+local core = require("liv.core")
+
+---@type liv.std.highlight
+return (core.is_nvim and require("liv.std.highlight._nvim") or require("liv.std.highlight._vim"))(core)

@@ -8,7 +8,7 @@
 -- failures / 2 usage error / 4 no tests found) that the bin shim passes straight
 -- to os.exit. Dev-only, never vendored (like liv.bundler).
 
-local argument = require("liv.lua.argument")
+local argument = require("liv.lua.argument.parse")
 local select = require("liv.tester._select")
 local l3runner = require("liv.tester._l3")
 local reporters = require("liv.tester.reporters")

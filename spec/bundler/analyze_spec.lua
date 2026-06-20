@@ -207,6 +207,42 @@ describe("analyze.closure tree-shaking (real sources)", function()
     assert.is_nil(set["liv.lua.text"])
   end)
 
+  it("argument.parse pulls nothing else: not format, not the barrel", function()
+    local set = module_set({ "liv.lua.argument.parse" })
+    -- positive control: the parse leaf itself resolved (a typo'd root would
+    -- resolve to nil and drop out of the set, failing this assertion). The parse
+    -- side is dependency-free, so the root-resolved check is the non-vacuous
+    -- guard here, mirroring text.coerce.
+    assert.is_true(set["liv.lua.argument.parse"])
+    -- the format inverse and the barrel (which would re-pull the whole family)
+    -- stay out of a parse-only bundle.
+    assert.is_nil(set["liv.lua.argument.format"])
+    assert.is_nil(set["liv.lua.argument"])
+  end)
+
+  it("base64.encode pulls the shared tables but NOT the decode leaf or barrel", function()
+    local set = module_set({ "liv.lua.base64.encode" })
+    assert.is_true(set["liv.lua.base64.encode"])
+    -- positive control: the encoder derives its alphabet tables from the shared
+    -- helper, so it must be present (rules out a vacuous nil-root run that would
+    -- pass every exclusion below).
+    assert.is_true(set["liv.lua.base64._tables"])
+    -- the decode direction and the barrel must stay out of an encode-only bundle
+    assert.is_nil(set["liv.lua.base64.decode"])
+    assert.is_nil(set["liv.lua.base64"])
+  end)
+
+  it("base64.decode pulls the shared tables but NOT the encode leaf or barrel", function()
+    local set = module_set({ "liv.lua.base64.decode" })
+    assert.is_true(set["liv.lua.base64.decode"])
+    -- positive control: the decoder derives its alphabet tables from the shared
+    -- helper, so it must be present.
+    assert.is_true(set["liv.lua.base64._tables"])
+    -- the encode direction and the barrel must stay out of a decode-only bundle
+    assert.is_nil(set["liv.lua.base64.encode"])
+    assert.is_nil(set["liv.lua.base64"])
+  end)
+
   it("std.mapping pulls the coerce leaf but NOT the display-width group", function()
     local set = module_set({ "liv.std.mapping" })
     assert.is_true(set["liv.std.mapping"])

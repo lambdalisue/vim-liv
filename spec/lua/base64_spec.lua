@@ -56,6 +56,36 @@ describe("liv.lua.base64", function()
     end)
   end)
 
+  describe("leaf-direct require (tree-shaking surface)", function()
+    -- The family is split so an encode-only consumer never vendors the decoder
+    -- and vice versa. Each side is requirable on its own through its public leaf.
+    it("exposes encode / encode_url through the encode leaf alone", function()
+      local encode = require("liv.lua.base64.encode")
+      assert.equal("Zm9vYmFy", encode.encode("foobar"))
+      assert.equal("Zg==", encode.encode("f"))
+      assert.equal("Zg", encode.encode_url("f"))
+      assert.equal("Pz8_", encode.encode_url("???"))
+    end)
+
+    it("exposes decode / decode_url through the decode leaf alone", function()
+      local decode = require("liv.lua.base64.decode")
+      assert.equal("foobar", decode.decode("Zm9vYmFy"))
+      assert.equal("f", decode.decode("Zg=="))
+      assert.equal("f", decode.decode_url("Zg"))
+      assert.equal("\251\255", decode.decode_url("-_8"))
+    end)
+
+    it("keeps the module-prefixed error on the decode leaf", function()
+      local decode = require("liv.lua.base64.decode")
+      local ok, err = pcall(decode.decode, "Zm9v*===")
+      assert.is_false(ok)
+      assert.is_true(
+        tostring(err):find("liv.lua.base64", 1, true) ~= nil,
+        "expected liv.lua.base64-prefixed error, got: " .. tostring(err)
+      )
+    end)
+  end)
+
   describe("URL-safe variant (encode_url / decode_url)", function()
     it("emits - and _ instead of + and / and omits padding", function()
       -- "???" (0x3F x3) encodes to "Pz8/" in standard base64 (uses /); the two

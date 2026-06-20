@@ -3,162 +3,169 @@
 -- re-implementing flag parsing per plugin: `split` (quote-aware tokenizer) and
 -- `parse` (Vim-style `++opt` long-options + `-f`/`--flag` flags + positional
 -- residue), plus the optional `format` inverse used to rebuild a command line.
+--
+-- The family is split into independently-requirable leaves so a parse-only
+-- consumer never vendors the format inverse: the `split`/`parse` tests drive the
+-- `parse` leaf directly; the `format` tests drive the `format` leaf directly; and
+-- a final block proves the barrel still re-exposes the flat public API.
+local parse = require("liv.lua.argument.parse")
+local format = require("liv.lua.argument.format")
 local argument = require("liv.lua.argument")
 
-describe("liv.lua.argument.split", function()
+describe("liv.lua.argument.parse split", function()
   it("splits on unquoted runs of whitespace", function()
-    assert.same({ "a", "b", "c" }, argument.split("a  b\tc"))
+    assert.same({ "a", "b", "c" }, parse.split("a  b\tc"))
   end)
 
   it("keeps a single-quoted run as one token (quotes removed)", function()
-    assert.same({ "a b" }, argument.split("'a b'"))
+    assert.same({ "a b" }, parse.split("'a b'"))
   end)
 
   it("keeps a double-quoted run as one token (quotes removed)", function()
-    assert.same({ "c d" }, argument.split('"c d"'))
+    assert.same({ "c d" }, parse.split('"c d"'))
   end)
 
   it("treats a backslash as escaping the next character", function()
-    assert.same({ "a b" }, argument.split("a\\ b"))
+    assert.same({ "a b" }, parse.split("a\\ b"))
   end)
 
   it("emits an empty-string token for empty quotes", function()
-    assert.same({ "" }, argument.split("''"))
-    assert.same({ "x", "", "y" }, argument.split("x '' y"))
+    assert.same({ "" }, parse.split("''"))
+    assert.same({ "x", "", "y" }, parse.split("x '' y"))
   end)
 
   it("returns an empty array for empty or whitespace-only input", function()
-    assert.same({}, argument.split(""))
-    assert.same({}, argument.split("   \t  "))
+    assert.same({}, parse.split(""))
+    assert.same({}, parse.split("   \t  "))
   end)
 
   it("is lenient with an unterminated quote (emits what it has)", function()
-    assert.same({ "a b" }, argument.split("'a b"))
+    assert.same({ "a b" }, parse.split("'a b"))
   end)
 
   it("does not treat quotes inside a bare word as delimiters", function()
-    assert.same({ "ab cd" }, argument.split("a'b c'd"))
+    assert.same({ "ab cd" }, parse.split("a'b c'd"))
   end)
 end)
 
 describe("liv.lua.argument.parse", function()
   it("parses the canonical mix of opts, flags, and positionals", function()
-    local opts, flags, rest = argument.parse("++enc=utf8 -f --foo=bar --foo=baz hello world")
+    local opts, flags, rest = parse.parse("++enc=utf8 -f --foo=bar --foo=baz hello world")
     assert.same({ enc = "utf8" }, opts)
     assert.same({ f = true, foo = { "bar", "baz" } }, flags)
     assert.same({ "hello", "world" }, rest)
   end)
 
   it("accepts an array of already-split tokens (no re-splitting)", function()
-    local opts, flags, rest = argument.parse({ "++enc=utf8", "--name=a b", "pos" })
+    local opts, flags, rest = parse.parse({ "++enc=utf8", "--name=a b", "pos" })
     assert.same({ enc = "utf8" }, opts)
     assert.same({ name = "a b" }, flags) -- token kept verbatim, not re-split
     assert.same({ "pos" }, rest)
   end)
 
   it("reads a valueless `++name` opt as boolean true", function()
-    local opts = argument.parse("++binary ++enc=latin1")
+    local opts = parse.parse("++binary ++enc=latin1")
     assert.same({ binary = true, enc = "latin1" }, opts)
   end)
 
   it("reads a valueless `--name` long flag as boolean true", function()
-    local _, flags = argument.parse("--verbose")
+    local _, flags = parse.parse("--verbose")
     assert.same({ verbose = true }, flags)
   end)
 
   it("never consumes the following token as a value for a `=`-less flag", function()
     -- `--foo bar` is `flags.foo = true` plus positional `bar`; values arrive
     -- ONLY via `=`. No lookahead, so parsing stays deterministic.
-    local _, flags, rest = argument.parse("--foo bar")
+    local _, flags, rest = parse.parse("--foo bar")
     assert.same({ foo = true }, flags)
     assert.same({ "bar" }, rest)
   end)
 
   it("collects a repeated long flag into an array preserving order", function()
-    local _, flags = argument.parse("--inc=a --inc=b --inc=c")
+    local _, flags = parse.parse("--inc=a --inc=b --inc=c")
     assert.same({ inc = { "a", "b", "c" } }, flags)
   end)
 
   it("collects a repeated opt into an array preserving order", function()
-    local opts = argument.parse("++set=a ++set=b")
+    local opts = parse.parse("++set=a ++set=b")
     assert.same({ set = { "a", "b" } }, opts)
   end)
 
   it("promotes a boolean-then-value repeat into an array", function()
     -- `--foo --foo=bar`: first true, then "bar" -> { true, "bar" }.
-    local _, flags = argument.parse("--foo --foo=bar")
+    local _, flags = parse.parse("--foo --foo=bar")
     assert.same({ foo = { true, "bar" } }, flags)
   end)
 
   it("treats a literal `--` as the end of option parsing", function()
     -- Everything after `--` is positional, even if it looks like a flag/opt;
     -- opts/flags BEFORE the `--` are parsed normally.
-    local opts, flags, rest = argument.parse("++enc=utf8 --keep -- --not-a-flag ++not-an-opt pos")
+    local opts, flags, rest = parse.parse("++enc=utf8 --keep -- --not-a-flag ++not-an-opt pos")
     assert.same({ enc = "utf8" }, opts)
     assert.same({ keep = true }, flags)
     assert.same({ "--not-a-flag", "++not-an-opt", "pos" }, rest)
   end)
 
   it("keeps unknown opts and flags (no schema, no validation)", function()
-    local opts, flags = argument.parse("++anything=1 --whatever=2 -z")
+    local opts, flags = parse.parse("++anything=1 --whatever=2 -z")
     assert.same({ anything = "1" }, opts)
     assert.same({ whatever = "2", z = true }, flags)
   end)
 
   it("returns three empty tables for empty input", function()
-    local opts, flags, rest = argument.parse("")
+    local opts, flags, rest = parse.parse("")
     assert.same({}, opts)
     assert.same({}, flags)
     assert.same({}, rest)
   end)
 
   it("returns three empty tables for an empty token array", function()
-    local opts, flags, rest = argument.parse({})
+    local opts, flags, rest = parse.parse({})
     assert.same({}, opts)
     assert.same({}, flags)
     assert.same({}, rest)
   end)
 
   it("handles positional-only input", function()
-    local opts, flags, rest = argument.parse("one two three")
+    local opts, flags, rest = parse.parse("one two three")
     assert.same({}, opts)
     assert.same({}, flags)
     assert.same({ "one", "two", "three" }, rest)
   end)
 
   it("handles flag-only input", function()
-    local _, flags, rest = argument.parse("-a -b --c")
+    local _, flags, rest = parse.parse("-a -b --c")
     assert.same({ a = true, b = true, c = true }, flags)
     assert.same({}, rest)
   end)
 
   it("treats a bare `-` as a positional, not a flag", function()
-    local _, flags, rest = argument.parse("-")
+    local _, flags, rest = parse.parse("-")
     assert.same({}, flags)
     assert.same({ "-" }, rest)
   end)
 
   it("treats an empty `=` value as an empty string", function()
-    local _, flags = argument.parse("--name=")
+    local _, flags = parse.parse("--name=")
     assert.same({ name = "" }, flags)
   end)
 
   it("supports a value that contains `=` (only the first splits)", function()
-    local _, flags = argument.parse("--expr=a=b=c")
+    local _, flags = parse.parse("--expr=a=b=c")
     assert.same({ expr = "a=b=c" }, flags)
   end)
 
   it("treats a multi-character short cluster as a single flag key", function()
     -- Short-flag clustering is out of scope: `-abc` is one flag named `abc`,
     -- NOT three flags `a`/`b`/`c`. Documented, deterministic, never a crash.
-    local _, flags = argument.parse("-abc")
+    local _, flags = parse.parse("-abc")
     assert.same({ abc = true }, flags)
   end)
 end)
 
 describe("liv.lua.argument.format", function()
   it("renders opts, flags, and rest back into a command line", function()
-    local s = argument.format({ enc = "utf8" }, { f = true, foo = "bar" }, { "pos" })
+    local s = format.format({ enc = "utf8" }, { f = true, foo = "bar" }, { "pos" })
     -- Deterministic: opts then flags (sorted by key: `f` < `foo`), then
     -- positionals.
     assert.equal("++enc=utf8 -f --foo=bar pos", s)
@@ -168,22 +175,22 @@ describe("liv.lua.argument.format", function()
     local opts0 = { enc = "utf8" }
     local flags0 = { f = true, foo = { "bar", "baz" }, verbose = true }
     local rest0 = { "hello", "a positional with spaces" }
-    local opts1, flags1, rest1 = argument.parse(argument.format(opts0, flags0, rest0))
+    local opts1, flags1, rest1 = parse.parse(format.format(opts0, flags0, rest0))
     assert.same(opts0, opts1)
     assert.same(flags0, flags1)
     assert.same(rest0, rest1)
   end)
 
   it("quotes a positional that contains whitespace so it re-splits", function()
-    local s = argument.format({}, {}, { "a b" })
-    assert.same({ "a b" }, argument.split(s))
+    local s = format.format({}, {}, { "a b" })
+    assert.same({ "a b" }, parse.split(s))
   end)
 
   it("emits a `--` so an option-like positional survives the round-trip", function()
     -- "--foo"/"-x"/"++opt"/"--" as positionals must come back as `rest`, not
     -- re-parse as flags/opts; format guards them with a `--` terminator.
     local rest0 = { "--foo", "-x", "++opt", "--" }
-    local opts, flags, rest = argument.parse(argument.format({}, {}, rest0))
+    local opts, flags, rest = parse.parse(format.format({}, {}, rest0))
     assert.same({}, opts)
     assert.same({}, flags)
     assert.same(rest0, rest)
@@ -191,7 +198,18 @@ describe("liv.lua.argument.format", function()
 
   it("round-trips a positional containing a backslash", function()
     local rest0 = { "a\\b" }
-    local _, _, rest = argument.parse(argument.format({}, {}, rest0))
+    local _, _, rest = parse.parse(format.format({}, {}, rest0))
     assert.same(rest0, rest)
+  end)
+end)
+
+describe("liv.lua.argument barrel", function()
+  it("re-exposes the flat split/parse/format API for back-compat", function()
+    -- The barrel keeps the historical flat surface so consumers that import the
+    -- family as a whole keep working; the leaves are an additive split, not a
+    -- breaking move.
+    assert.equal(parse.split, argument.split)
+    assert.equal(parse.parse, argument.parse)
+    assert.equal(format.format, argument.format)
   end)
 end)

@@ -13,7 +13,7 @@ Format: one entry per version, newest first.
 
 ```
 Unreleased
-    Modules: liv.std.variable, liv.std.function, liv.std.option, liv.std.mapping, liv.std.popup, liv.std.bufname, liv.std.process, liv.std.mark, liv.has, liv.lua.zlib.inflate, liv.lua.zlib.deflate, liv.lua.png.decode, liv.lua.png.encode, liv.lua.msgpack.pack, liv.lua.msgpack.unpack, liv.lua.color.rgb, liv.lua.color.hsl, liv.lua.color.xterm256, liv.lua.text.coerce, liv.lua.text.width
+    Modules: liv.std.variable, liv.std.function, liv.std.option, liv.std.mapping, liv.std.popup, liv.std.bufname, liv.std.process, liv.std.mark, liv.has, liv.lua.zlib.inflate, liv.lua.zlib.deflate, liv.lua.png.decode, liv.lua.png.encode, liv.lua.msgpack.pack, liv.lua.msgpack.unpack, liv.lua.color.rgb, liv.lua.color.hsl, liv.lua.color.xterm256, liv.lua.text.coerce, liv.lua.text.width, liv.lua.argument.parse, liv.lua.argument.format
     BREAKING: std modules renamed to align with denops/std vocabulary. API
     signatures are unchanged — only the module path/name moved. Update requires:
       liv.std.var   -> liv.std.variable
@@ -109,4 +109,29 @@ Unreleased
     option API and value coercion are identical); a consumer that directly
     required liv.std.option._generated for its records — never a public
     contract — would need to read the annotations instead.
+    ADD: liv.lua.argument was split from a single flat file (argument.lua) into
+    parse/format leaves (argument/init.lua is now the barrel) so a parse-only
+    consumer never vendors the rarely-used format inverse. The barrel
+    (liv.lua.argument) keeps its full flat API unchanged — require("liv.lua.argument")
+    behaves exactly as before, so this is purely additive (no consumer require
+    path was renamed). New public leaf paths a consumer may require directly
+    instead of the barrel:
+      liv.lua.argument.parse  — split / parse (quote-aware tokenizer + classifier, zero deps)
+      liv.lua.argument.format — format (rebuild a command line from a parse, zero deps)
+    The two sides are fully independent (parse never calls format and vice
+    versa), so a parse-only bundle (require liv.lua.argument.parse) no longer
+    ships the format inverse.
+    ADD: liv.lua.base64 was split from a single flat file (base64.lua) into
+    encode/decode leaves (base64/init.lua is now the barrel) so an encode-only
+    consumer never vendors the decoder (and vice versa). The barrel
+    (liv.lua.base64) keeps its full flat API unchanged — require("liv.lua.base64")
+    behaves exactly as before, so this is purely additive (no consumer require
+    path was renamed). New public leaf paths a consumer may require directly
+    instead of the barrel:
+      liv.lua.base64.encode — encode / encode_url (RFC 4648 §4/§5 encoder)
+      liv.lua.base64.decode — decode / decode_url (one decoder serves both alphabets)
+    Both leaves share the internal liv.lua.base64._tables alphabet helper (kept
+    underscore-prefixed; a consumer never imports it directly). The two sides are
+    fully independent (encode never calls decode and vice versa), so an
+    encode-only bundle (require liv.lua.base64.encode) no longer ships the decoder.
 ```

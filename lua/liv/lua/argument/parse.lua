@@ -1,9 +1,13 @@
--- liv.lua.argument — command-argument parser (spec 0009). Pure Lua, editor-
--- independent, deterministic, L1-testable. liv.std.command handlers receive a
--- RAW argument string, and every plugin would otherwise re-implement flag
--- parsing; this owns liv's own vocabulary for it (modeled on Vim's `:command`
--- arg conventions + `:edit ++opt` long-options), NOT a copy of any one editor's
--- shape.
+-- liv.lua.argument.parse — the parse side of the command-argument family (spec
+-- 0009). Pure Lua, editor-independent, deterministic, L1-testable. liv.std.command
+-- handlers receive a RAW argument string, and every plugin would otherwise
+-- re-implement flag parsing; this owns liv's own vocabulary for it (modeled on
+-- Vim's `:command` arg conventions + `:edit ++opt` long-options), NOT a copy of
+-- any one editor's shape.
+--
+-- This leaf is the common case: it tokenizes (`split`) and classifies (`parse`)
+-- command arguments and never reaches for the `format` inverse, so a parse-only
+-- consumer vendors only this file, not the format side.
 --
 -- `parse` is the core. It returns THREE values — `opts`, `flags`, `rest` — and is
 -- a GENERIC parser: it never validates against a schema, so unknown opts/flags are
@@ -164,102 +168,6 @@ function M.parse(input)
   end
 
   return opts, flags, rest
-end
-
--- Quote a token for `format` so it survives a `split` round-trip. A token that is
--- empty or contains whitespace/quotes/backslash is wrapped in single quotes;
--- backslashes and single quotes inside are backslash-escaped (split treats `\` as
--- an escape even inside quotes, so a literal `\` must be doubled). Otherwise the
--- token is emitted bare.
----@param token string
----@return string
-local function quote(token)
-  if token == "" or token:find("[%s'\"\\]") then
-    return "'" .. token:gsub("[\\']", "\\%0") .. "'"
-  end
-  return token
-end
-
--- Emit one `key=value` pair sequence for an opt/flag entry, applying the repeat
--- expansion `parse` would collapse: an array expands into repeated keys; a boolean
--- `true` emits the bare flag (no `=`); a string emits `prefix..key=value`.
----@param out string[]
----@param prefix string `"++"` or `"--"`
----@param key string
----@param value string|boolean|(string|boolean)[]
-local function emit(out, prefix, key, value)
-  local items = type(value) == "table" and value or { value }
-  for _, item in ipairs(items) do
-    if item == true then
-      out[#out + 1] = prefix .. key
-    else
-      out[#out + 1] = prefix .. key .. "=" .. tostring(item)
-    end
-  end
-end
-
--- Sorted keys of a table, for deterministic output (mirrors uri.query.encode_query).
----@param tbl table
----@return string[]
-local function sorted_keys(tbl)
-  local keys = {}
-  for k in pairs(tbl) do
-    keys[#keys + 1] = k
-  end
-  table.sort(keys)
-  return keys
-end
-
--- Build a command line from `opts`, `flags`, `rest` — the inverse of `parse`. The
--- round-trip is SEMANTIC (`parse(format(o, f, r))` deep-equals `o, f, r`), not
--- byte-exact: key order is normalized (opts then flags, each sorted) and
--- positionals are quoted as needed. Short single-character boolean flags render as
--- `-x`; long flags render as `--name`.
----@param opts? table<string, string|boolean|(string|boolean)[]>
----@param flags? table<string, string|boolean|(string|boolean)[]>
----@param rest? string[]
----@return string
-function M.format(opts, flags, rest)
-  opts = opts or {}
-  flags = flags or {}
-  rest = rest or {}
-
-  local out = {}
-
-  for _, key in ipairs(sorted_keys(opts)) do
-    emit(out, "++", key, opts[key])
-  end
-
-  for _, key in ipairs(sorted_keys(flags)) do
-    local value = flags[key]
-    -- A single-character boolean flag is a short flag (`-x`); anything else is a
-    -- long flag (`--name` / `--name=value`).
-    if value == true and #key == 1 then
-      out[#out + 1] = "-" .. key
-    else
-      emit(out, "--", key, value)
-    end
-  end
-
-  -- A positional that looks like a flag/opt/terminator (`-…`, `++…`, or `--`)
-  -- would be re-parsed as one; emit a `--` terminator first so the whole `rest`
-  -- survives the round-trip as positionals.
-  local needs_terminator = false
-  for _, token in ipairs(rest) do
-    if token:sub(1, 1) == "-" or token:sub(1, 2) == "++" then
-      needs_terminator = true
-      break
-    end
-  end
-  if needs_terminator then
-    out[#out + 1] = "--"
-  end
-
-  for _, token in ipairs(rest) do
-    out[#out + 1] = quote(token)
-  end
-
-  return table.concat(out, " ")
 end
 
 return M

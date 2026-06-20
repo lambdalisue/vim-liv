@@ -11,6 +11,7 @@
 local argument = require("liv.lua.argument.parse")
 local select = require("liv.tester._select")
 local l3runner = require("liv.tester._l3")
+local layer = require("liv.tester._layer")
 local reporters = require("liv.tester.reporters")
 local config = require("liv.tester._config")
 local failed_store = require("liv.tester._failed")
@@ -77,8 +78,9 @@ includes, excludes.
 
 Exit codes: 0 all passed, 1 test failures, 2 usage error, 4 no tests found.
 
-The cross-layer roll-up (L1/L3 summary lines + TOTAL) is always printed; the
-chosen reporter renders the L1 per-test detail above it.
+One reporter renders EVERY layer's per-test detail — L1 then each L3 editor —
+sectioned by a per-layer header with continuous numbering. The cross-layer
+roll-up (L1/L3 summary lines + TOTAL) is always printed below it.
 
 L3 (test/) runs each file in its OWN editor invocation per editor, so a crash
 or hang in one file costs only that cell: a missing result file is reported as
@@ -267,10 +269,11 @@ end
 
 -- Load + run L1 specs in-process, driving `reporter` (a run() event table) for
 -- the per-test detail. Load/register failures happen BEFORE any test event, so
--- they are returned separately (`load_failures`) for the caller to print and fold
--- into the totals — otherwise a spec that fails to load would be invisible to the
--- reporter and undercount the run. Returns passed, failed, skipped, failures, and
--- load_failures (already included in `failed`/`failures`).
+-- they emit no test event of their own; we synthesize one failed `on_test_end`
+-- per load failure THROUGH the reporter so a spec that fails to load is visible
+-- in the per-test detail (with continuous numbering) and not just folded into a
+-- count. Returns passed, failed, skipped, failures, and load_failures (already
+-- included in `failed`/`failures`).
 local function run_l1(files, tester, filter, reporter, seed)
   tester.reset()
   local load_failures = {}
@@ -291,6 +294,9 @@ local function run_l1(files, tester, filter, reporter, seed)
   for _, lf in ipairs(load_failures) do
     failed = failed + 1
     failures[#failures + 1] = lf
+    if reporter.on_test_end then
+      reporter.on_test_end({ name = lf.name, status = "failed", duration = 0, error = lf.err })
+    end
   end
   return passed, failed, skipped, failures, load_failures
 end
@@ -305,16 +311,6 @@ local function run_l1_register_only(files, tester, _filter)
     local chunk = loadfile(file)
     if chunk then
       pcall(chunk)
-    end
-  end
-end
-
--- Echo a child's result body (or a crash/timeout detail line), skipping the
--- machine-readable RESULT header.
-local function print_detail(body)
-  for line in (body or ""):gmatch("[^\n]+") do
-    if not line:match("^RESULT") then
-      io.write("  " .. line .. "\n")
     end
   end
 end
@@ -539,30 +535,45 @@ function M.main(opts)
   -- Failing test names accumulated across BOTH layers, persisted for `--failed`.
   local run_failures = {}
 
+  -- ONE reporter renders EVERY layer (L1 + each L3 editor) so numbering is
+  -- continuous and the output is sectioned by layer. The CLI owns the reporter
+  -- lifecycle: it fires on_run_start once up front and on_run_end once at the end
+  -- with the COMBINED stats, while each layer's events flow through a per-layer
+  -- `forwarder` that emits the section header (on_layer_enter) and stamps each
+  -- record's layer (the forwarder swallows the per-layer run_start/run_end).
+  local reporter = reporter_factory({
+    write = io.write,
+    color = is_tty,
+    verbose = settings.verbose,
+    quiet = settings.quiet,
+  })
+  if reporter.on_run_start then
+    reporter.on_run_start({})
+  end
+  -- Wall-clock the whole run for the single on_run_end's duration (the per-layer
+  -- forwarders swallow their run_start/run_end, so the CLI times the combined run).
+  local run_started = os.clock()
+
+  -- The combined run totals, the SINGLE source of truth for the reporter's plan/
+  -- summary AND the roll-up lines below — derived from the same numbers so they
+  -- can never disagree. Roll-up lines are buffered and printed after on_run_end so
+  -- the per-test detail stays above the cross-layer aggregation.
+  local total_pass, total_skip = 0, 0
+  local rollup = {}
+
   local l1 = scope(discover(project .. "/spec"))
   if #l1 > 0 then
     ran_any = true
-    -- The reporter renders the per-test L1 detail; the roll-up line below is the
-    -- CLI's cross-layer aggregation and is always printed verbatim.
-    local reporter = reporter_factory({
-      write = io.write,
-      color = is_tty,
-      verbose = settings.verbose,
-      quiet = settings.quiet,
-    })
-    local p, f, s, failures, load_failures = run_l1(l1, tester, filter, reporter, settings.seed)
+    local fwd = layer.forwarder(reporter, "L1")
+    local p, f, s, failures = run_l1(l1, tester, filter, fwd, settings.seed)
     total_fail = total_fail + f
+    total_pass = total_pass + p
+    total_skip = total_skip + s
     -- Persist every L1 failure by name + origin (file:line captured at it()).
     for _, fail in ipairs(failures) do
       run_failures[#run_failures + 1] = { name = fail.name, file = fail.file, line = fail.line }
     end
-    -- Load/register failures precede any test event, so the reporter never sees
-    -- them; surface them explicitly so a spec that fails to load is not invisible.
-    for _, lf in ipairs(load_failures) do
-      io.write("  FAIL " .. lf.name .. "\n")
-      io.write("    " .. tostring(lf.err):gsub("\n", "\n    ") .. "\n")
-    end
-    io.write(fmt_layer("L1 (no editor)", p, f, s))
+    rollup[#rollup + 1] = fmt_layer("L1 (no editor)", p, f, s)
   end
 
   local l3 = scope(discover(project .. "/test"))
@@ -587,38 +598,42 @@ function M.main(opts)
       })
       total_fail = total_fail + outcome.failed
 
-      -- Report one summary line per editor, aggregating that editor's cells, then
-      -- echo each cell's failure/timeout/crash detail. The parent only sees L3
-      -- failures as `FAIL\t<name>` lines in each cell body, so persistence parses
-      -- those names back out for `--failed`.
+      -- Replay each editor's cells THROUGH a per-editor forwarder, so the layer's
+      -- per-test detail prints under one "L3 (<editor>)" header with continuous
+      -- numbering. Cells are taken in deterministic file × editor order. Named
+      -- failures are collected from the structured records (cells that actually
+      -- ran) for `--failed`; a crash/timeout cell's synthetic record names the
+      -- file+editor, not a real test title, so it is not persisted.
       for _, bin in ipairs(editors) do
         local p, f, s = 0, 0, 0
-        local details = {}
+        local fwd = layer.forwarder(reporter, "L3:" .. bin)
         for _, cell in ipairs(outcome.results) do
           if cell.editor == bin then
             p = p + cell.passed
             f = f + cell.failed
             s = s + cell.skipped + (cell.status == "skipped" and 1 or 0)
-            if cell.failed > 0 or cell.status == "skipped" then
-              details[#details + 1] = cell.detail
-            end
-            -- Persist named failures only from cells that actually RAN. A crash/
-            -- timeout cell's synthetic `FAIL\t<file> (<editor>) [...]` line is not
-            -- a test title, so collecting it would store a name `--failed` could
-            -- never rerun. (The crashed file itself is still re-run by default.)
+            layer.replay(fwd, cell.records)
             if cell.status == "ran" then
-              for _, name in ipairs(failed_store.collect_l3_names(cell.detail or "")) do
+              for _, name in ipairs(failed_store.collect_l3_names(cell.records)) do
                 run_failures[#run_failures + 1] = { name = name, file = cell.file }
               end
             end
           end
         end
-        io.write(fmt_layer(string.format("L3 %-5s", bin), p, f, s))
-        for _, body in ipairs(details) do
-          print_detail(body)
-        end
+        total_pass = total_pass + p
+        total_skip = total_skip + s
+        rollup[#rollup + 1] = fmt_layer(string.format("L3 %-5s", bin), p, f, s)
       end
     end
+  end
+
+  if reporter.on_run_end then
+    reporter.on_run_end({
+      passed = total_pass,
+      failed = total_fail,
+      skipped = total_skip,
+      duration = os.clock() - run_started,
+    })
   end
 
   if not ran_any then
@@ -630,6 +645,12 @@ function M.main(opts)
   -- run correctly reruns nothing.
   failed_store.save(failed_store.state_path(project), run_failures)
 
+  -- The cross-layer roll-up: one line per layer (same counts the reporter saw),
+  -- then TOTAL. Printed after the reporter's own summary so per-test detail stays
+  -- on top.
+  for _, line in ipairs(rollup) do
+    io.write(line)
+  end
   io.write(string.format("\nTOTAL: %d failed\n", total_fail))
   return M.exit_code({ ran = ran_any, failed = total_fail, usage_error = false })
 end

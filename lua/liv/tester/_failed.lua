@@ -94,17 +94,17 @@ function M.filter(names)
   end
 end
 
--- Extract the failing test names from a child's L3 result body. The parent only
--- sees L3 failures as `FAIL\t<name>` lines (the structured records live in the
--- child), so persisting cross-layer failures means parsing those lines back out.
----@param body string
+-- Extract the failing test names from a child's L3 per-test records. The child
+-- now serializes its full event stream (each `{ "test_end", report }`), so the
+-- parent collects failure names directly from the structured records rather than
+-- re-parsing free text — exact names with pattern-magic characters survive intact.
+---@param records table[] the cell's per-test event records
 ---@return string[]
-function M.collect_l3_names(body)
+function M.collect_l3_names(records)
   local names = {}
-  for line in (body or ""):gmatch("[^\n]+") do
-    local name = line:match("^FAIL\t(.+)$")
-    if name then
-      names[#names + 1] = name
+  for _, ev in ipairs(records or {}) do
+    if ev[1] == "test_end" and ev[2] and ev[2].status == "failed" then
+      names[#names + 1] = ev[2].name
     end
   end
   return names

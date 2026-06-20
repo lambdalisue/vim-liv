@@ -39,6 +39,33 @@ local function drive(reporter)
   reporter.on_run_end({ passed = 1, failed = 1, skipped = 1, duration = 0.01 })
 end
 
+-- Drive a reporter across TWO layers, each emitting its own layer boundary, so
+-- the layer-section behaviour (header per layer, continuous numbering) can be
+-- asserted. A reporter that does not implement `on_layer_enter` ignores it.
+local function drive_layered(reporter)
+  reporter.on_run_start({})
+  if reporter.on_layer_enter then
+    reporter.on_layer_enter("L1")
+  end
+  reporter.on_suite_enter("group")
+  reporter.on_test_start("group passes")
+  reporter.on_test_end({ name = "group passes", status = "passed", duration = 0.001, layer = "L1" })
+  reporter.on_suite_leave("group")
+  if reporter.on_layer_enter then
+    reporter.on_layer_enter("L3:nvim")
+  end
+  reporter.on_suite_enter("backend")
+  reporter.on_test_start("backend works")
+  reporter.on_test_end({
+    name = "backend works",
+    status = "passed",
+    duration = 0.002,
+    layer = "L3:nvim",
+  })
+  reporter.on_suite_leave("backend")
+  reporter.on_run_end({ passed = 2, failed = 0, skipped = 0, duration = 0.01 })
+end
+
 describe("liv.tester.reporters.tap", function()
   it("emits a 1..N plan and ok/not ok lines", function()
     local write, read = sink()
@@ -64,6 +91,24 @@ describe("liv.tester.reporters.tap", function()
         assert.equal("#", line:sub(1, 1))
       end
     end
+  end)
+
+  it("emits a # <layer> comment at each layer boundary with continuous numbering", function()
+    local write, read = sink()
+    drive_layered(reporters.tap({ write = write }))
+    local out = read()
+    assert.is_not_nil(out:find("# L1 (no editor)", 1, true))
+    assert.is_not_nil(out:find("# L3 (nvim)", 1, true))
+    -- Numbering is continuous across layers (the L3 test is ok 2, not ok 1).
+    assert.is_not_nil(out:find("ok 1 - group passes", 1, true))
+    assert.is_not_nil(out:find("ok 2 - backend works", 1, true))
+    assert.is_not_nil(out:find("1..2", 1, true))
+  end)
+
+  it("emits no layer comment when no layer boundary is signalled", function()
+    local write, read = sink()
+    drive(reporters.tap({ write = write }))
+    assert.is_nil(read():find("# L1 (no editor)", 1, true))
   end)
 end)
 
@@ -94,6 +139,14 @@ describe("liv.tester.reporters.jsonl", function()
     assert.is_not_nil(read():find('"type":"summary"', 1, true))
   end)
 
+  it("stamps each test object with its layer field", function()
+    local write, read = sink()
+    drive_layered(reporters.jsonl({ write = write }))
+    local out = read()
+    assert.is_not_nil(out:find('"layer":"L1"', 1, true))
+    assert.is_not_nil(out:find('"layer":"L3:nvim"', 1, true))
+  end)
+
   it("escapes special characters in the JSON string values", function()
     local write, read = sink()
     local r = reporters.jsonl({ write = write })
@@ -122,6 +175,20 @@ describe("liv.tester.reporters.spec", function()
     local write, read = sink()
     drive(reporters.spec({ write = write, color = false }))
     assert.is_not_nil(read():find("group", 1, true))
+  end)
+
+  it("prints a section header per layer above that layer's suites", function()
+    local write, read = sink()
+    drive_layered(reporters.spec({ write = write, color = false }))
+    local out = read()
+    assert.is_not_nil(out:find("L1 (no editor)", 1, true))
+    assert.is_not_nil(out:find("L3 (nvim)", 1, true))
+    -- The L1 header precedes its suite, which precedes the L3 header.
+    local l1 = out:find("L1 (no editor)", 1, true)
+    local group = out:find("group", 1, true)
+    local l3 = out:find("L3 (nvim)", 1, true)
+    assert.is_true(l1 < group)
+    assert.is_true(group < l3)
   end)
 
   it("does not emit ANSI escapes when color is off", function()
@@ -179,6 +246,17 @@ describe("liv.tester.reporters.junit", function()
     local out = read()
     assert.is_not_nil(out:find("&lt;", 1, true))
     assert.is_not_nil(out:find("&amp;", 1, true))
+  end)
+
+  it("groups testcases into a testsuite per layer", function()
+    local write, read = sink()
+    drive_layered(reporters.junit({ write = write }))
+    local out = read()
+    -- One <testsuite> per layer, named by the human label.
+    assert.is_not_nil(out:find('<testsuite name="L1 (no editor)"', 1, true))
+    assert.is_not_nil(out:find('<testsuite name="L3 (nvim)"', 1, true))
+    -- Wrapped in a <testsuites> root so multiple suites stay valid XML.
+    assert.is_not_nil(out:find("<testsuites", 1, true))
   end)
 end)
 

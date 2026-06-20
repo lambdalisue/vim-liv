@@ -48,6 +48,60 @@ describe("liv.tester._l3 orchestrator", function()
     assert.equal(1, outcome.failed)
   end)
 
+  it("surfaces a child's per-test records (events payload) on the cell", function()
+    local layer = require("liv.tester._layer")
+    local events = {
+      { "suite_enter", "backend" },
+      { "test_end", { name = "backend ok", status = "passed", duration = 0.01 } },
+      { "test_end", { name = "backend bad", status = "failed", duration = 0.02, error = "boom" } },
+      { "suite_leave", "backend" },
+    }
+    local payload = layer.serialize(events)
+    -- Write the payload to a temp file the fake child cats into OUT after RESULT.
+    local pf = os.tmpname()
+    local h = assert(io.open(pf, "w"))
+    h:write(payload)
+    h:close()
+    local outcome = l3.run({
+      files = { "ev_spec.lua" },
+      editors = { "nvim" },
+      jobs = 1,
+      timeout = 5,
+      build_command = fake_builder({
+        ["ev_spec.lua"] = "{ printf 'RESULT\\t1\\t1\\t0\\n'; printf 'EVENTS\\n'; cat '"
+          .. pf
+          .. '\'; } > "$OUT"',
+      }),
+    })
+    os.remove(pf)
+    local r = outcome.results[1]
+    assert.is_table(r.records)
+    -- The per-test detail round-trips into structured records the CLI can replay.
+    assert.same(events, r.records)
+    assert.equal(1, r.passed)
+    assert.equal(1, r.failed)
+  end)
+
+  it("synthesizes a failed record for a crashed cell (so it is not invisible)", function()
+    local outcome = l3.run({
+      files = { "boom_spec.lua" },
+      editors = { "nvim" },
+      jobs = 1,
+      timeout = 5,
+      build_command = fake_builder({
+        ["boom_spec.lua"] = "exit 1", -- writes no OUT
+      }),
+    })
+    local r = outcome.results[1]
+    -- The crash contributes exactly one failed per-test record naming file+editor.
+    assert.is_table(r.records)
+    assert.equal(1, #r.records)
+    assert.equal("test_end", r.records[1][1])
+    assert.equal("failed", r.records[1][2].status)
+    assert.is_not_nil(r.records[1][2].name:find("boom_spec.lua", 1, true))
+    assert.is_not_nil(r.records[1][2].name:find("nvim", 1, true))
+  end)
+
   it("counts a crashed child (no result file) as a failure naming file+editor", function()
     local outcome = l3.run({
       files = { "crash_spec.lua" },

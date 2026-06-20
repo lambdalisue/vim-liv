@@ -53,19 +53,25 @@ describe("liv.tester._failed.filter (exact full-title membership)", function()
 end)
 
 describe("liv.tester._failed.collect_l3_names", function()
-  it("extracts FAIL names from a child result body", function()
-    local body = table.concat({
-      "RESULT\t1\t2\t0",
-      "FAIL\ttest one failed",
-      "  traceback line",
-      "FAIL\ttest two (edge) failed",
-      "  more traceback",
-    }, "\n")
-    local names = failed.collect_l3_names(body)
+  it("extracts the failed test names from a child's per-test records", function()
+    local records = {
+      { "suite_enter", "g" },
+      { "test_end", { name = "test one failed", status = "failed", error = "boom" } },
+      { "test_end", { name = "test passes", status = "passed" } },
+      { "test_end", { name = "test two (edge) failed", status = "failed", error = "x" } },
+      { "suite_leave", "g" },
+    }
+    local names = failed.collect_l3_names(records)
     assert.same({ "test one failed", "test two (edge) failed" }, names)
   end)
 
-  it("returns an empty list for a body with no FAIL lines", function()
-    assert.same({}, failed.collect_l3_names("RESULT\t3\t0\t0\n"))
+  it("returns an empty list for records with no failures", function()
+    assert.same(
+      {},
+      failed.collect_l3_names({
+        { "test_end", { name = "ok", status = "passed" } },
+      })
+    )
+    assert.same({}, failed.collect_l3_names({}))
   end)
 end)

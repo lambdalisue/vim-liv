@@ -119,6 +119,11 @@ legacy `on_progress(status)`, invoked per resolved candidate. `run()` keeps
 returning `passed, failed, skipped, failures` regardless, so existing callers
 (`_editor.lua`, L1) are unaffected.
 
+`on_test_end`'s `report` also carries a **`layer`** field (`"L1"` /
+`"L3:<editor>"`) and the interface gains an **`on_layer_enter(layer)`** event —
+both **set by the CLI**, not by `run()` (which knows nothing of layers). See
+*Cross-layer output*.
+
 Reporters (`liv.tester.reporters`) are **pure factories** `fun(opts) -> callbacks`
 that consume this interface; `opts` injects the output sink (`write`) and the
 resolved environment booleans (`color`, `verbose`, `quiet`, `slow_threshold`), so
@@ -136,9 +141,53 @@ lives in the CLI, never in a reporter. Shipped reporters:
 - **junit** — a single `<testsuite>` with one `<testcase>` per test (`<failure>` /
   `<skipped>` children).
 
+### Cross-layer output (every test labelled by layer)
+
+**One** reporter renders **every** layer's per-test detail — L1, then each L3
+editor — so a reader can tell, for any item, which layer it belongs to and can
+see individual L3 tests (not just an aggregate count). The CLI owns the reporter
+lifecycle to make this one continuous stream:
+
+- it fires `on_run_start` once up front and `on_run_end` once at the end with the
+  **combined** stats;
+- each layer's events flow through a per-layer **forwarder** (`liv.tester._layer`)
+  that emits `on_layer_enter(layer)` once (the section header) and stamps each
+  `report.layer`, while **swallowing** that layer's own `run_start`/`run_end` (so
+  there is exactly one of each across the whole run);
+- L1 streams live through its forwarder; each L3 child's per-test records are
+  **replayed** through its editor's forwarder as cells complete.
+
+Numbering is therefore **continuous** across layers and the output is sectioned:
+`# L1 (no editor)` … `# L3 (nvim)` … `# L3 (vim)` …, then the `1..N` plan and the
+summary. Reporters render the layer their own way: **spec** a bold section header
+per layer (suites/tests beneath), **tap** a `# <layer>` comment at each boundary,
+**jsonl** a `"layer"` field on every test object, **junit** a `<testsuite>` per
+layer (named by the human label) inside a `<testsuites>` root.
+
+For this to hold, **anything without a normal `on_test_end` is synthesized into a
+record** so it stays visible and the plan count matches the summary: an L3
+crash/timeout/spawn-failure cell and a skip-budget cell become one synthetic
+record naming the file+editor (`_l3`); an L1/L3 load/register failure (which
+precedes any test event) becomes one synthetic failed record (`run_l1` /
+`_editor.lua`).
+
+The **L3 result protocol** carries the per-test stream out of the child editor:
+`LIV_L3_OUT` is the `RESULT\t<p>\t<f>\t<s>` summary line (kept as the
+back-compatible count + crash gate), then an `EVENTS` marker, then the serialized
+event stream — a **Lua return-table** (`%q`-safe, so multi-line error text with
+tabs/quotes round-trips). A missing/partial/unparseable payload is the crash
+signal: the parent counts that cell as a failure naming file+editor. `--failed`
+collects L3 failure names directly from these **structured records** (not free
+text), so exact names with pattern-magic characters survive.
+
 The cross-layer roll-up (`L1`/`L3` summary lines + `TOTAL`) is the CLI's own
-aggregation and is always printed; the reporter renders the L1 per-test detail
-above it.
+aggregation, derived from the **same** combined counts the reporter saw (one
+source of truth, so the plan and the roll-up can never disagree), and is always
+printed below the per-test detail.
+
+(The framework layer is now the structural source of truth for a test's layer, so
+the manual `(L3)` suffix many `test/` `describe` names still carry is redundant —
+left in place rather than churning every file.)
 
 `assert.same` failures name the **first diverging key path** (with the two leaf
 values) before dumping the full tables, so the reader sees exactly what differs.
@@ -260,10 +309,10 @@ file like the config). `--failed` restricts the next run to **exactly** those
 tests. The match is **exact full-title set membership**, NOT the Lua-pattern
 `--select` path — test names routinely contain pattern-magic characters
 (`-`, `(`, `.`). `--failed` ANDs with any active `--select`. Cross-layer: L1
-failures come from the structured `run()` records; L3 failures are parsed back
-out of each child's `FAIL\t<name>` result lines (the parent sees only those), so
-a `--failed` rerun reaches L3 tests too, propagated to children via `LIV_FAILED`
-(newline-joined exact names). `.liv/` is git-ignored.
+failures come from the structured `run()` records; L3 failures come from each
+child's serialized per-test records (the `EVENTS` payload — see *Cross-layer
+output*), so a `--failed` rerun reaches L3 tests too, propagated to children via
+`LIV_FAILED` (newline-joined exact names). `.liv/` is git-ignored.
 
 ### Randomized order (`--seed=N`)
 

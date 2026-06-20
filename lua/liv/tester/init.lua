@@ -53,8 +53,15 @@ end
 -- over its own tree, so instances never share state.
 ---@return table instance
 function M.new()
-  local root =
-    { name = "", children = {}, befores = {}, afters = {}, befores_all = {}, afters_all = {}, tags = {} }
+  local root = {
+    name = "",
+    children = {},
+    befores = {},
+    afters = {},
+    befores_all = {},
+    afters_all = {},
+    tags = {},
+  }
   local stack = { root }
 
   -- The finally list of the test BODY currently executing, so `finally()` can
@@ -206,8 +213,15 @@ function M.new()
 
   -- Discard all registered tests (for a fresh run within one process).
   function instance.reset()
-    root =
-      { name = "", children = {}, befores = {}, afters = {}, befores_all = {}, afters_all = {}, tags = {} }
+    root = {
+      name = "",
+      children = {},
+      befores = {},
+      afters = {},
+      befores_all = {},
+      afters_all = {},
+      tags = {},
+    }
     stack = { root }
   end
 
@@ -241,6 +255,9 @@ function M.new()
   --   on_test_end(report)          after it resolves; report =
   --                                { name, status, duration, error?, file?, line? }
   --   on_run_end(stats)            once, stats = { passed, failed, skipped, duration }
+  -- (`on_layer_enter(layer)` is ALSO part of the reporter interface, but it is
+  -- emitted by the CLI between layers — not by run(), which knows nothing of
+  -- layers — so a reporter implements it for the L1/L3 section headers.)
   -- A bare FUNCTION is accepted for back-compat: it is treated as the old
   -- `on_progress(status)`, invoked per resolved candidate with the three-state tag.
   --
@@ -408,8 +425,13 @@ function M.new()
                 -- Carry the it() declaration origin (file:line) on the failure
                 -- record too, not just the reporter event, so the CLI's
                 -- `--failed` state file records where the test lives.
-                failures[#failures + 1] =
-                  { name = name, err = err, status = "failed", file = child.file, line = child.line }
+                failures[#failures + 1] = {
+                  name = name,
+                  err = err,
+                  status = "failed",
+                  file = child.file,
+                  line = child.line,
+                }
               end
             end
             report.duration = clock() - started

@@ -86,16 +86,28 @@ for _, file in ipairs(files) do
   end
 end
 
-local passed, failed, skipped, failures = tester.run(nil, { filter = filter, seed = seed })
+-- Run WITH a capturing reporter so each test's per-test record (name, status,
+-- duration, error, file, line) survives out of the editor — the parent replays
+-- these through the main reporter so L3 shows per-test detail, not just counts.
+local layer = require("liv.tester._layer")
+local rec = layer.recorder()
+local passed, failed, skipped = tester.run(rec.reporter, { filter = filter, seed = seed })
+
+-- A load/register failure precedes any test event (the spec never built its
+-- registry), so the recorder never saw it; synthesize a failed record per one so
+-- it is visible and counted — the L3 analog of a crashed cell.
+local events = rec.events()
 for _, f in ipairs(load_failures) do
   failed = failed + 1
-  failures[#failures + 1] = f
+  events[#events + 1] =
+    { "test_end", { name = f.name, status = "failed", duration = 0, error = tostring(f.err) } }
 end
 
 local out = assert(io.open(os.getenv("LIV_L3_OUT"), "w"))
 out:write(string.format("RESULT\t%d\t%d\t%d\n", passed, failed, skipped))
-for _, f in ipairs(failures) do
-  out:write("FAIL\t" .. f.name .. "\n")
-  out:write("  " .. tostring(f.err):gsub("\n", "\n  ") .. "\n")
-end
+-- The per-test event stream follows an EVENTS marker (a Lua return-table the
+-- parent loads); a partial write leaves it unparseable, which the parent reads as
+-- a crash. The RESULT line above stays as the back-compatible summary + crash gate.
+out:write("EVENTS\n")
+out:write(layer.serialize(events))
 out:close()

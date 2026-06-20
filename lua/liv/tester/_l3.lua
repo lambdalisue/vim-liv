@@ -22,7 +22,19 @@
 -- result-file protocol, one list-file entry per child, so `_editor.lua` is
 -- unchanged.
 
+local layer = require("liv.tester._layer")
+
 local M = {}
+
+-- One synthetic failed per-test record naming a (file, editor) cell, for a cell
+-- with no real per-test stream (crash / timeout / spawn failure). Stamped so the
+-- CLI replay shows it instead of letting the failure vanish from per-test detail.
+local function synthetic_record(file, editor, detail)
+  local name = file .. " (" .. editor .. ")"
+  return {
+    { "test_end", { name = name, status = "failed", duration = 0, error = detail } },
+  }
+end
 
 -- Default per-file timeout (seconds). Generous on purpose: a real editor cold
 -- start can take a few seconds, and a false timeout would turn a healthy run red.
@@ -116,39 +128,52 @@ local function sleep(seconds)
   os.execute("sleep " .. tostring(seconds))
 end
 
--- Read and parse a child's result file AFTER it has exited. A present, parseable
--- RESULT line yields passed/failed/skipped + the raw body; a missing or partial
--- file is a single failure (the child crashed before writing a usable result).
----@return { passed: integer, failed: integer, skipped: integer, detail: string, ok: boolean }
+-- Read and parse a child's result file AFTER it has exited. The file is a
+-- RESULT summary line, then (since the L3 detail surfacing change) an optional
+-- `EVENTS\n` marker followed by the serialized per-test event stream (a Lua
+-- return-table the parent loads). A present, parseable RESULT line yields
+-- passed/failed/skipped + the per-test `records`; a missing or partial file is a
+-- single synthesized failure (the child crashed before writing a usable result).
+---@return { passed: integer, failed: integer, skipped: integer, detail: string, records: table[], ok: boolean }
 local function collect_result(out, file, editor)
   local fh = io.open(out, "r")
   if not fh then
+    local detail = "FAIL\t" .. file .. " (" .. editor .. ") [no result file: child crashed]"
     return {
       passed = 0,
       failed = 1,
       skipped = 0,
       ok = false,
-      detail = "FAIL\t" .. file .. " (" .. editor .. ") [no result file: child crashed]",
+      detail = detail,
+      records = synthetic_record(file, editor, "no result file: child crashed"),
     }
   end
   local body = fh:read("*a")
   fh:close()
   local p, f, s = body:match("RESULT\t(%d+)\t(%d+)\t(%d+)")
   if not p then
+    local detail = "FAIL\t" .. file .. " (" .. editor .. ") [partial result file: child crashed]"
     return {
       passed = 0,
       failed = 1,
       skipped = 0,
       ok = false,
-      detail = "FAIL\t" .. file .. " (" .. editor .. ") [partial result file: child crashed]",
+      detail = detail,
+      records = synthetic_record(file, editor, "partial result file: child crashed"),
     }
   end
+  -- The per-test event stream follows an `EVENTS\n` marker. Absent (an old-format
+  -- or fake child that wrote only RESULT) → no records; present but unparseable →
+  -- treated as no records (the counts from RESULT still stand).
+  local payload = body:match("\nEVENTS\n(.*)$")
+  local records = payload and layer.deserialize(payload) or {}
   return {
     passed = tonumber(p),
     failed = tonumber(f),
     skipped = tonumber(s),
     ok = true,
     detail = body,
+    records = records or {},
   }
 end
 
@@ -226,6 +251,7 @@ function M.run(opts)
             failed = r.failed,
             skipped = r.skipped,
             detail = r.detail,
+            records = r.records,
             status = "ran",
           }
           total_failed = total_failed + r.failed
@@ -238,19 +264,25 @@ function M.run(opts)
           sleep(0.1)
           term(job.pid)
           os.remove(job.out)
+          local detail = "FAIL\t"
+            .. job.cell.file
+            .. " ("
+            .. job.cell.editor
+            .. ") [timeout: child killed after "
+            .. tostring(timeout)
+            .. "s]"
           results[index] = {
             file = job.cell.file,
             editor = job.cell.editor,
             passed = 0,
             failed = 1,
             skipped = 0,
-            detail = "FAIL\t"
-              .. job.cell.file
-              .. " ("
-              .. job.cell.editor
-              .. ") [timeout: child killed after "
-              .. tostring(timeout)
-              .. "s]",
+            detail = detail,
+            records = synthetic_record(
+              job.cell.file,
+              job.cell.editor,
+              "timeout: child killed after " .. tostring(timeout) .. "s"
+            ),
             status = "failed",
           }
           total_failed = total_failed + 1
@@ -319,6 +351,7 @@ function M.run(opts)
           failed = 1,
           skipped = 0,
           detail = "FAIL\t" .. cell.file .. " (" .. cell.editor .. ") [could not spawn child]",
+          records = synthetic_record(cell.file, cell.editor, "could not spawn child"),
           status = "failed",
         }
         total_failed = total_failed + 1
@@ -356,6 +389,7 @@ function M.run(opts)
   for index = 1, #cells do
     if results[index] == nil then
       local cell = cells[index]
+      local name = cell.file .. " (" .. cell.editor .. ")"
       results[index] = {
         file = cell.file,
         editor = cell.editor,
@@ -367,6 +401,17 @@ function M.run(opts)
           .. " ("
           .. cell.editor
           .. ") [not run: failure budget spent]",
+        records = {
+          {
+            "test_end",
+            {
+              name = name,
+              status = "skipped",
+              duration = 0,
+              reason = "not run: failure budget spent",
+            },
+          },
+        },
         status = "skipped",
       }
     end

@@ -27,6 +27,9 @@ local function recorder()
         log[#log + 1] = "run_start"
         ctx = c
       end,
+      on_layer_enter = function(name)
+        log[#log + 1] = "layer_enter:" .. name
+      end,
       on_suite_enter = function(name)
         log[#log + 1] = "suite_enter:" .. name
       end,
@@ -64,6 +67,18 @@ describe("liv.tester reporter event interface", function()
       "suite_leave:group",
       "run_end",
     }, rec.log)
+  end)
+
+  it("does not emit on_layer_enter (layers are sectioned by the CLI, not run)", function()
+    local t = tester.new()
+    t.describe("group", function()
+      t.it("a", function() end)
+    end)
+    local rec = recorder()
+    t.run(rec.reporter)
+    for _, entry in ipairs(rec.log) do
+      assert.is_nil(entry:find("layer_enter", 1, true))
+    end
   end)
 
   it("emits a test_end for skipped and failed tests too", function()

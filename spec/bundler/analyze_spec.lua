@@ -133,4 +133,56 @@ describe("analyze.closure tree-shaking (real sources)", function()
     assert.is_nil(set["liv.lua.uri.url"])
     assert.is_nil(set["liv.lua.uri"])
   end)
+
+  it("png.decode pulls inflate but NOT deflate", function()
+    local set = module_set({ "liv.lua.png.decode" })
+    assert.is_true(set["liv.lua.png.decode"])
+    assert.is_true(set["liv.lua.zlib.inflate"])
+    assert.is_nil(set["liv.lua.zlib.deflate"])
+    -- and never the barrel that would re-pull the whole family
+    assert.is_nil(set["liv.lua.zlib"])
+  end)
+
+  it("png.encode pulls deflate but NOT inflate", function()
+    local set = module_set({ "liv.lua.png.encode" })
+    assert.is_true(set["liv.lua.png.encode"])
+    assert.is_true(set["liv.lua.zlib.deflate"])
+    assert.is_nil(set["liv.lua.zlib.inflate"])
+    assert.is_nil(set["liv.lua.zlib"])
+  end)
+
+  it("msgpack.pack pulls value/compat but NOT the unpack leaf or the barrel", function()
+    local set = module_set({ "liv.lua.msgpack.pack" })
+    assert.is_true(set["liv.lua.msgpack.pack"])
+    -- positive control: the packer's real deps must be present, so a vacuous
+    -- nil-root run (which would pass every exclusion below) is ruled out.
+    assert.is_true(set["liv.lua.value"])
+    assert.is_true(set["liv.lua.compat"])
+    -- the decode direction and the barrel must stay out of an encode-only bundle
+    assert.is_nil(set["liv.lua.msgpack.unpack"])
+    assert.is_nil(set["liv.lua.msgpack"])
+  end)
+
+  it("msgpack.unpack pulls value but NOT the pack leaf or the barrel", function()
+    local set = module_set({ "liv.lua.msgpack.unpack" })
+    assert.is_true(set["liv.lua.msgpack.unpack"])
+    -- positive control: the unpacker really depends on value.
+    assert.is_true(set["liv.lua.value"])
+    -- the encode direction and the barrel must stay out of a decode-only bundle
+    assert.is_nil(set["liv.lua.msgpack.pack"])
+    assert.is_nil(set["liv.lua.msgpack"])
+  end)
+
+  it("std.hash pulls the md5/sha1 leaves but NOT sha256 or the barrel", function()
+    local set = module_set({ "liv.std.hash" })
+    assert.is_true(set["liv.std.hash"])
+    -- md5/sha1 have no editor builtin guarantee, so std.hash delegates to the
+    -- pure leaves directly (positive control: a typo'd root would resolve nil).
+    assert.is_true(set["liv.lua.hash.md5"])
+    assert.is_true(set["liv.lua.hash.sha1"])
+    -- sha256 is served by the editor builtin, so its pure leaf must stay out,
+    -- and the barrel (which would re-pull the whole family) must never enter.
+    assert.is_nil(set["liv.lua.hash.sha256"])
+    assert.is_nil(set["liv.lua.hash"])
+  end)
 end)

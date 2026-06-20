@@ -1,9 +1,11 @@
 -- liv.lua.png decoder: PNG bytes -> raw pixel data plus geometry. Pure and
 -- 5.1-compatible. It verifies the signature, walks the chunk stream, reads
--- IHDR, inflates the concatenated IDAT data via liv.lua.zlib, then unfilters
--- every scanline (None/Sub/Up/Average/Paeth). Only the 8-bit, non-interlaced
--- truecolour formats are supported: color type 2 (RGB) and 6 (RGBA).
-local zlib = require("liv.lua.zlib")
+-- IHDR, inflates the concatenated IDAT data via liv.lua.zlib.inflate, then
+-- unfilters every scanline (None/Sub/Up/Average/Paeth). Only the 8-bit,
+-- non-interlaced truecolour formats are supported: color type 2 (RGB) and 6
+-- (RGBA). It requires only the inflate leaf (never the zlib barrel) so a
+-- decode-only consumer does not bundle the deflate codec.
+local zlib = require("liv.lua.zlib.inflate")
 
 local byte = string.byte
 local char = string.char

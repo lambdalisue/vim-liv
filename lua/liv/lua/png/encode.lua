@@ -1,8 +1,10 @@
 -- liv.lua.png encoder: raw pixels + geometry -> PNG bytes. Pure and
 -- 5.1-compatible. It writes the signature, an IHDR (8-bit truecolour, color
 -- type 2 or 6), a single IDAT (each scanline prefixed with a None filter byte
--- then deflated via liv.lua.zlib), and IEND. Every chunk carries its CRC-32.
-local zlib = require("liv.lua.zlib")
+-- then deflated via liv.lua.zlib.deflate), and IEND. Every chunk carries its
+-- CRC-32. It requires only the deflate leaf (never the zlib barrel) so an
+-- encode-only consumer does not bundle the heavier inflate codec.
+local zlib = require("liv.lua.zlib.deflate")
 local crc32 = require("liv.lua.png._crc")
 
 local char = string.char

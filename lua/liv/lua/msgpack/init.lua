@@ -6,8 +6,8 @@
 ---@class liv.lua.msgpack
 ---@field encode fun(v: any): string
 ---@field decode fun(s: string, pos?: integer): any, integer
-local pack = require("liv.lua.msgpack._pack")
-local unpack = require("liv.lua.msgpack._unpack")
+local pack = require("liv.lua.msgpack.pack")
+local unpack = require("liv.lua.msgpack.unpack")
 
 local M = {}
 M.encode = pack.encode

@@ -81,6 +81,28 @@ whether a module is editor-dependent (can degrade) or pure (guaranteed).
   (`bin/liv-generator`), never in a consumer's runtime require graph → never
   vendored. No editor dependency — it reads doc text files, not a live editor.
 
+## Module granularity / barrel rule
+
+The bundler closure is **file-grained**: it follows static literal `require`s and
+vendors whole files, with no per-function dead-code elimination. A consumer
+vendors exactly the files in its require closure, so the split boundary between
+files — and the direction deps flow across it — is what determines bundle size.
+
+- **One-way deps: barrel → leaf only.** A barrel (`init.lua`) MAY require its
+  leaves to offer a convenience / dispatch API. A **leaf MUST NOT require its
+  barrel** (or any path that pulls the barrel): doing so re-pulls the whole
+  family even when a consumer required just one leaf, defeating the split. An
+  internal consumer that needs one leaf requires THAT leaf directly, never the
+  barrel — e.g. `liv.lua.png.decode` requires `liv.lua.zlib.inflate`, not
+  `liv.lua.zlib`.
+- **Consumer-importable leaves get public names** (no leading `_`). The `_`
+  prefix is reserved for truly-internal shared helpers a consumer never imports
+  (e.g. `liv.lua.png._crc`, `liv.lua.path._build`).
+- **New multi-codec / multi-algorithm families start leaf-split + thin barrel:**
+  one public leaf per independently-usable concern, plus a barrel that requires
+  the leaves for the all-in-one / dispatch API. Don't pack independent concerns
+  into one fat file — a consumer wanting one concern then bundles them all.
+
 ## Bundler distribution
 
 - `plugin/liv.vim` is a thin command shell delegating to `liv.bundler`.

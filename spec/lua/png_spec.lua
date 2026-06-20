@@ -55,3 +55,24 @@ describe("liv.lua.png", function()
     end
   end)
 end)
+
+-- The leaves are public so a consumer that only decodes (or only encodes) can
+-- bundle just that direction; each leaf returns the bare codec function.
+describe("liv.lua.png leaves", function()
+  it("exposes decode via the public leaf without requiring the barrel", function()
+    local decode = require("liv.lua.png.decode")
+    local img = decode(readfile("spec/fixtures/png/tiny.png"))
+    assert.equal(3, img.width)
+    assert.equal(2, img.height)
+    assert.equal("rgba", img.format)
+    assert.equal(readfile("spec/fixtures/png/tiny.rgba"), img.data)
+  end)
+
+  it("exposes encode via the public leaf without requiring the barrel", function()
+    local encode = require("liv.lua.png.encode")
+    local decode = require("liv.lua.png.decode")
+    local src = readfile("spec/fixtures/png/tiny.rgba")
+    local img = decode(encode({ data = src, width = 3, height = 2, format = "rgba" }))
+    assert.equal(src, img.data)
+  end)
+end)

@@ -41,3 +41,21 @@ describe("liv.lua.zlib", function()
     )
   end)
 end)
+
+-- The leaves are public so a consumer can bundle just one codec direction
+-- (decompress-only / compress-only) without pulling the whole zlib family.
+describe("liv.lua.zlib leaves", function()
+  it("exposes inflate via the public leaf without requiring the barrel", function()
+    local inflate = require("liv.lua.zlib.inflate")
+    local stream = readfile("spec/fixtures/png/stream.zlib")
+    local plain = readfile("spec/fixtures/png/stream.plain")
+    assert.equal(plain, inflate.inflate(stream))
+  end)
+
+  it("exposes deflate via the public leaf without requiring the barrel", function()
+    local deflate = require("liv.lua.zlib.deflate")
+    local inflate = require("liv.lua.zlib.inflate")
+    local data = "round-trip via leaves \0\1\2"
+    assert.equal(data, inflate.inflate(deflate.deflate(data)))
+  end)
+end)

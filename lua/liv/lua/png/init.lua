@@ -6,8 +6,8 @@
 ---@class liv.lua.png
 ---@field decode fun(bytes: string): { data: string, width: integer, height: integer, format: string }
 ---@field encode fun(img: { data: string, width: integer, height: integer, format: string }): string
-local decode = require("liv.lua.png._decode")
-local encode = require("liv.lua.png._encode")
+local decode = require("liv.lua.png.decode")
+local encode = require("liv.lua.png.encode")
 
 local M = {}
 M.decode = decode

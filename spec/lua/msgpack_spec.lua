@@ -124,6 +124,27 @@ describe("liv.lua.msgpack round-trips", function()
   end)
 end)
 
+describe("liv.lua.msgpack leaves (direct require)", function()
+  -- A consumer that only encodes (or only decodes) can require the matching
+  -- leaf directly, bundling just that direction without the other.
+  it("pack leaf encodes without the unpack leaf", function()
+    local pack = require("liv.lua.msgpack.pack")
+    assert.equal("\x93\x01\x02\x03", pack.encode({ 1, 2, 3 }))
+  end)
+
+  it("unpack leaf decodes without the pack leaf", function()
+    local unpack = require("liv.lua.msgpack.unpack")
+    local v, nxt = unpack.decode("\x93\x01\x02\x03")
+    assert.same({ 1, 2, 3 }, v)
+    assert.equal(5, nxt)
+  end)
+
+  it("the barrel keeps the combined encode/decode API", function()
+    assert.equal("\x01", mp.encode(1))
+    assert.equal(1, (mp.decode("\x01")))
+  end)
+end)
+
 describe("liv.lua.msgpack decode (truncated input)", function()
   -- Truncated input must raise the module-prefixed error like an unsupported
   -- byte does, never an unguarded "arithmetic on a nil value" stdlib error.

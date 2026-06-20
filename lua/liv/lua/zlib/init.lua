@@ -6,8 +6,8 @@
 ---@class liv.lua.zlib
 ---@field inflate fun(s: string): string
 ---@field deflate fun(s: string): string
-local inflate = require("liv.lua.zlib._inflate")
-local deflate = require("liv.lua.zlib._deflate")
+local inflate = require("liv.lua.zlib.inflate")
+local deflate = require("liv.lua.zlib.deflate")
 
 local M = {}
 M.inflate = inflate.inflate

@@ -13,7 +13,7 @@ Format: one entry per version, newest first.
 
 ```
 Unreleased
-    Modules: liv.std.variable, liv.std.function, liv.std.mapping, liv.std.popup, liv.std.bufname, liv.std.process, liv.std.mark, liv.has
+    Modules: liv.std.variable, liv.std.function, liv.std.mapping, liv.std.popup, liv.std.bufname, liv.std.process, liv.std.mark, liv.has, liv.lua.zlib.inflate, liv.lua.zlib.deflate, liv.lua.png.decode, liv.lua.png.encode, liv.lua.msgpack.pack, liv.lua.msgpack.unpack
     BREAKING: std modules renamed to align with denops/std vocabulary. API
     signatures are unchanged — only the module path/name moved. Update requires:
       liv.std.var   -> liv.std.variable
@@ -49,4 +49,28 @@ Unreleased
       liv.lua.uri.query   — encode_query / decode_query (requires the percent leaf)
     A percent-only bundle (require liv.lua.uri.percent) no longer ships parse/build
     or the query codec; a query-only bundle pulls percent but not parse/build.
+    BREAKING: the zlib and png codec leaves were promoted from internal
+    (underscore-prefixed) to public module paths so a consumer can bundle just
+    one codec direction without pulling the whole family. The barrels
+    (liv.lua.zlib, liv.lua.png) keep their inflate/deflate and decode/encode
+    API unchanged — only direct requires of the old internal leaf paths must
+    move:
+      liv.lua.zlib._inflate -> liv.lua.zlib.inflate
+      liv.lua.zlib._deflate -> liv.lua.zlib.deflate
+      liv.lua.png._decode   -> liv.lua.png.decode
+      liv.lua.png._encode   -> liv.lua.png.encode
+    liv.lua.png._crc stays internal (a consumer never imports it directly).
+    png.decode now requires only liv.lua.zlib.inflate and png.encode only
+    liv.lua.zlib.deflate, so a decode-only bundle no longer ships deflate and an
+    encode-only bundle no longer ships the heavier inflate.
+    BREAKING: the msgpack pack/unpack leaves were promoted from internal
+    (underscore-prefixed) to public module paths so a consumer can bundle just
+    one direction (encode XOR decode) without pulling the other. The barrel
+    (liv.lua.msgpack) keeps its encode/decode API unchanged — only direct
+    requires of the old internal leaf paths must move:
+      liv.lua.msgpack._pack   -> liv.lua.msgpack.pack
+      liv.lua.msgpack._unpack -> liv.lua.msgpack.unpack
+    msgpack.pack requires only liv.lua.value and liv.lua.compat, and
+    msgpack.unpack only liv.lua.value, so an encode-only bundle no longer ships
+    the decoder and a decode-only bundle no longer ships the encoder.
 ```

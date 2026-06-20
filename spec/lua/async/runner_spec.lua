@@ -47,9 +47,12 @@ describe("runner.run + await", function()
         resume(true, 3)
       end)
       return a * b
-    end, { schedule = schedule, on_done = function(_, v)
-      got = v
-    end })
+    end, {
+      schedule = schedule,
+      on_done = function(_, v)
+        got = v
+      end,
+    })
     drain()
     assert.equal(6, got)
   end)
@@ -61,9 +64,12 @@ describe("runner.run + await", function()
       runner.await(function(resume)
         resume(false, "boom")
       end)
-    end, { schedule = schedule, on_done = function(ok, err)
-      got = { ok = ok, err = err }
-    end })
+    end, {
+      schedule = schedule,
+      on_done = function(ok, err)
+        got = { ok = ok, err = err }
+      end,
+    })
     drain()
     assert.is_false(got.ok)
     assert.is_true(tostring(got.err):find("boom", 1, true) ~= nil)
@@ -74,9 +80,12 @@ describe("runner.run + await", function()
     local got
     runner.run(function()
       error("explode")
-    end, { schedule = schedule, on_done = function(ok, err)
-      got = { ok = ok, err = err }
-    end })
+    end, {
+      schedule = schedule,
+      on_done = function(ok, err)
+        got = { ok = ok, err = err }
+      end,
+    })
     drain()
     assert.is_false(got.ok)
     assert.is_true(tostring(got.err):find("explode", 1, true) ~= nil)
@@ -92,9 +101,12 @@ describe("runner.run + await", function()
         end)
       end)
       return ok, err
-    end, { schedule = schedule, on_done = function(_, v)
-      got = v
-    end })
+    end, {
+      schedule = schedule,
+      on_done = function(_, v)
+        got = v
+      end,
+    })
     drain()
     assert.is_false(got)
   end)
@@ -110,9 +122,12 @@ describe("runner.wrap", function()
     local got
     runner.run(function()
       return add(2, 3)
-    end, { schedule = schedule, on_done = function(_, v)
-      got = v
-    end })
+    end, {
+      schedule = schedule,
+      on_done = function(_, v)
+        got = v
+      end,
+    })
     drain()
     assert.equal(5, got)
   end)
@@ -129,9 +144,12 @@ describe("runner cancellation", function()
           canceler_called = true
         end
       end)
-    end, { schedule = schedule, on_done = function(ok, v)
-      calls[#calls + 1] = { ok = ok, v = v }
-    end })
+    end, {
+      schedule = schedule,
+      on_done = function(ok, v)
+        calls[#calls + 1] = { ok = ok, v = v }
+      end,
+    })
     drain() -- starts the coroutine; task stores resume and returns a canceler
 
     handle.cancel()
@@ -153,9 +171,12 @@ describe("runner cancellation", function()
       return runner.await(function(resume)
         resume(true, 7)
       end)
-    end, { schedule = schedule, on_done = function(ok, v)
-      calls[#calls + 1] = { ok = ok, v = v }
-    end })
+    end, {
+      schedule = schedule,
+      on_done = function(ok, v)
+        calls[#calls + 1] = { ok = ok, v = v }
+      end,
+    })
     drain() -- runs to completion: on_done(true, 7)
     assert.equal(1, #calls)
     assert.is_true(calls[1].ok)

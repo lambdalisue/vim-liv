@@ -11,6 +11,22 @@ local pack, unpack = compat.pack, compat.unpack
 
 local M = {}
 
+-- Maps a running coroutine to the `schedule` driving its run, so combinators
+-- (gather/select) invoked from inside an async function can spawn child runs
+-- onto the same main loop without the caller re-injecting `schedule`. Weak keys
+-- let a finished coroutine's entry be collected. Read via `current_schedule()`
+-- while still inside the coroutine (before the first await/yield), never from a
+-- task body (which runs on the main thread, where `coroutine.running()` differs).
+local schedules = setmetatable({}, { __mode = "k" })
+
+-- The schedule driving the currently running async function, or nil if called
+-- outside any run. Used by combinators to inherit the main loop.
+---@return (fun(fn: fun()))? schedule The schedule for the current coroutine, or nil.
+function M.current_schedule()
+  local co = coroutine.running()
+  return co and schedules[co] or nil
+end
+
 -- await: yield a CPS task; the resume delivers (ok, ...). On failure the error
 -- propagates as a Lua error, so pcall/cleanup/rethrow behave as in sync code.
 ---Await a CPS task from within a running async function.
@@ -66,6 +82,7 @@ function M.run(afn, opts)
   end
 
   local co = coroutine.create(afn)
+  schedules[co] = schedule
   -- `settled` guards the single terminal transition: once the run finishes,
   -- fails, or is cancelled, no further on_done / canceler may fire.
   local settled, cancel_current = false, nil

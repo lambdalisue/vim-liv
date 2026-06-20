@@ -45,5 +45,17 @@ return function(core)
     set_opt(name, value, target_dict(scope, target))
   end
 
+  -- Reset to default via the editor Ex command (no native "reset" exists in
+  -- nvim_set_option_value). `g` resets the global default (`setglobal name&`),
+  -- the others the current-buffer/window local default (`setlocal name&`) — each
+  -- matching the value the same scope's get reads.
+  function M.reset(scope, name)
+    if scope == "g" then
+      core.cmd("setglobal " .. name .. "&")
+    else
+      core.cmd("setlocal " .. name .. "&")
+    end
+  end
+
   return M
 end

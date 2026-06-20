@@ -7,18 +7,19 @@
 -- >=1 line" rule and leave a phantom empty line.) A handle of 0/nil resolves to
 -- the current buffer number once, here in std.
 return function(core)
-  local fn = vim.fn
-  local bufnr = core.marshaled(fn.bufnr)
-  local getbufline = core.marshaled(fn.getbufline)
-  local setbufline = core.marshaled(fn.setbufline)
-  local appendbufline = core.marshaled(fn.appendbufline)
-  local deletebufline = core.marshaled(fn.deletebufline)
-  local getbufinfo = core.marshaled(fn.getbufinfo)
-  local bufname = core.marshaled(fn.bufname)
-  local bufexists = core.marshaled(fn.bufexists)
-  local bufadd = core.marshaled(fn.bufadd)
-  local bufload = core.marshaled(fn.bufload)
-  local setbufvar = core.marshaled(fn.setbufvar)
+  local vimfn = vim.fn
+  local bufnr = core.marshaled(vimfn.bufnr)
+  local getbufline = core.marshaled(vimfn.getbufline)
+  local setbufline = core.marshaled(vimfn.setbufline)
+  local appendbufline = core.marshaled(vimfn.appendbufline)
+  local deletebufline = core.marshaled(vimfn.deletebufline)
+  local getbufinfo = core.marshaled(vimfn.getbufinfo)
+  local bufname = core.marshaled(vimfn.bufname)
+  local bufexists = core.marshaled(vimfn.bufexists)
+  local bufadd = core.marshaled(vimfn.bufadd)
+  local bufload = core.marshaled(vimfn.bufload)
+  local setbufvar = core.marshaled(vimfn.setbufvar)
+  local getbufvar = core.marshaled(vimfn.getbufvar)
 
   local M = {}
 
@@ -131,6 +132,64 @@ return function(core)
       buf = bufnr("%")
     end
     core.cmd("silent! bwipeout! " .. buf)
+  end
+
+  ---Run fn with buf as the current buffer, then restore the previously-current
+  ---buffer, even if fn errors. Returns fn's value.
+  ---
+  ---Vim has no nvim_buf_call, so save the current buffer number, switch with
+  ---`noautocmd keepalt keepjumps hide buffer <buf>` (suppress BufEnter/BufLeave
+  ---&c., preserve the alternate-file `#` register and the jumplist — so this
+  ---scoped switch leaves no observable side effect), run fn under pcall, restore
+  ---the original buffer the same non-disruptive way, then re-raise any error.
+  ---
+  ---The `hide` modifier is load-bearing: a *modified* current buffer would block
+  ---a plain no-bang `:buffer` (E37) under the default `'nohidden'`, and `:buffer!`
+  ---is wrong here because its bang risks discarding unsaved changes. `hide`
+  ---keeps the abandoned buffer loaded (changes preserved) for this one command,
+  ---so scoping away from a buffer you are editing is always safe — applied to
+  ---both the switch-to and the switch-back (fn may have modified `buf`).
+  ---@generic T
+  ---@param buf integer? buffer handle; 0/nil = current
+  ---@param fn fun(): T
+  ---@return T
+  function M.with(buf, fn)
+    local target = resolve(buf)
+    local previous = bufnr("%")
+    if target ~= previous then
+      core.cmd("noautocmd keepalt keepjumps hide buffer " .. target)
+    end
+    local ok, result = pcall(fn)
+    if bufnr("%") ~= previous then
+      core.cmd("noautocmd keepalt keepjumps hide buffer " .. previous)
+    end
+    if not ok then
+      error(result, 0) -- re-raise without re-prefixing the position
+    end
+    return result
+  end
+
+  ---Run fn with buf's 'modifiable' temporarily enabled (and 'readonly' cleared),
+  ---restoring both options afterward even if fn errors. Returns fn's value. This
+  ---is the "edit a normally-read-only buffer" pattern. getbufvar/setbufvar read
+  ---and write the buffer-local '&modifiable'/'&readonly' options (1/0).
+  ---@generic T
+  ---@param buf integer? buffer handle; 0/nil = current
+  ---@param fn fun(): T
+  ---@return T
+  function M.modifiable(buf, fn)
+    local target = resolve(buf)
+    local saved_modifiable = getbufvar(target, "&modifiable")
+    local saved_readonly = getbufvar(target, "&readonly")
+    setbufvar(target, "&modifiable", 1)
+    setbufvar(target, "&readonly", 0)
+    local ok, result = pcall(fn)
+    setbufvar(target, "&modifiable", saved_modifiable)
+    setbufvar(target, "&readonly", saved_readonly)
+    if not ok then
+      error(result, 0) -- re-raise without re-prefixing the position
+    end
+    return result
   end
 
   return M

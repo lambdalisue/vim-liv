@@ -4,7 +4,7 @@
 -- extmark id is returned directly; clear() drops the whole namespace for the
 -- buffer.
 return function(core)
-  local has = require("liv.has")
+  local has = require("liv.std.has")
   local create_ns = core.marshaled(vim.api.nvim_create_namespace)
   local set_extmark = core.marshaled(vim.api.nvim_buf_set_extmark)
   local del_extmark = core.marshaled(vim.api.nvim_buf_del_extmark)

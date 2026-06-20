@@ -14,11 +14,13 @@
 -- thus an organizational tag here; removal is always via the returned sub.
 return function(core)
   local dispatch = require("liv.std._dispatch")(core)
+  local autocmd_get = core.marshaled(vim.fn.autocmd_get)
   local seq = 0
 
   -- Built in the rhs and evaluated when the event fires; <abuf> is empty for
   -- non-buffer events, so str2nr("") yields 0.
-  local CTX = "{'buf': str2nr(expand('<abuf>')), 'file': expand('<afile>'), 'match': expand('<amatch>')}"
+  local CTX =
+    "{'buf': str2nr(expand('<abuf>')), 'file': expand('<afile>'), 'match': expand('<amatch>')}"
 
   local M = {}
 
@@ -66,6 +68,48 @@ return function(core)
         dispatch.unregister(id)
       end,
     }
+  end
+
+  ---@param opts? liv.std.autocmd.list.opts
+  ---@return liv.std.autocmd.info[]
+  function M.list(opts)
+    opts = opts or {}
+    -- Build the native query. Passing `group` to autocmd_get errors when the group
+    -- never existed, and the private-augroup suffix this backend adds would not
+    -- match the caller's group anyway, so group/pattern are filtered client-side.
+    -- An event list is queried event-by-event (autocmd_get takes a single event).
+    local events
+    if type(opts.event) == "table" then
+      events = opts.event
+    elseif opts.event ~= nil then
+      events = { opts.event }
+    else
+      events = { nil } -- a single all-events query
+    end
+
+    local out = {}
+    for i = 1, math.max(1, #events) do
+      local query = {}
+      if events[i] ~= nil then
+        query.event = events[i]
+      end
+      for _, a in ipairs(autocmd_get(core.dict(query))) do
+        local group = a.group
+        local group_ok = opts.group == nil
+          or group == opts.group
+          or (type(group) == "string" and group:sub(1, #opts.group + 1) == opts.group .. "_")
+        local pattern_ok = opts.pattern == nil or a.pattern == opts.pattern
+        if group_ok and pattern_ok then
+          out[#out + 1] = {
+            event = a.event,
+            pattern = a.pattern,
+            group = group,
+            buffer = a.bufnr or 0,
+          }
+        end
+      end
+    end
+    return out
   end
 
   ---@param name string the User event name to fire

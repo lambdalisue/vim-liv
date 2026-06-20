@@ -7,34 +7,46 @@ describe("bufname.format", function()
   end)
 
   it("percent-encodes Windows-unsafe characters in expr", function()
-    assert.equal("file://a%3C%3E%7C%3F%2A%22b", bufname.format({
-      scheme = "file",
-      expr = 'a<>|?*"b',
-    }))
+    assert.equal(
+      "file://a%3C%3E%7C%3F%2A%22b",
+      bufname.format({
+        scheme = "file",
+        expr = 'a<>|?*"b',
+      })
+    )
   end)
 
   it("appends sorted params after a semicolon", function()
-    assert.equal("x://e;a=1&b=2", bufname.format({
-      scheme = "x",
-      expr = "e",
-      params = { b = "2", a = "1" },
-    }))
+    assert.equal(
+      "x://e;a=1&b=2",
+      bufname.format({
+        scheme = "x",
+        expr = "e",
+        params = { b = "2", a = "1" },
+      })
+    )
   end)
 
   it("repeats a key for multi-value params, preserving array order", function()
-    assert.equal("x://e;k=1&k=2&k=3", bufname.format({
-      scheme = "x",
-      expr = "e",
-      params = { k = { "1", "2", "3" } },
-    }))
+    assert.equal(
+      "x://e;k=1&k=2&k=3",
+      bufname.format({
+        scheme = "x",
+        expr = "e",
+        params = { k = { "1", "2", "3" } },
+      })
+    )
   end)
 
   it("appends a fragment after a hash", function()
-    assert.equal("aiboprompt://1#lua", bufname.format({
-      scheme = "aiboprompt",
-      expr = "1",
-      fragment = "lua",
-    }))
+    assert.equal(
+      "aiboprompt://1#lua",
+      bufname.format({
+        scheme = "aiboprompt",
+        expr = "1",
+        fragment = "lua",
+      })
+    )
   end)
 
   it("raises on a non-alphabetic scheme", function()

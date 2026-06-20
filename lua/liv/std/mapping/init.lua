@@ -25,12 +25,32 @@
 ---@field buffer? boolean scope the mapping to the current buffer
 ---@class liv.std.mapping.sub
 ---@field off fun() remove this mapping (idempotent)
+-- Read-back info for an existing mapping. liv's own vocabulary, mapped from the
+-- editor's maparg dict (raw editor keys are not exposed). A Lua-function rhs is
+-- reported as the marker string "<Lua function>" (its real body is not a string);
+-- a string rhs is reported verbatim. The flag fields are Lua booleans.
+---@class liv.std.mapping.info
+---@field lhs string the left-hand side as typed
+---@field rhs string the right-hand side, or "<Lua function>" for a function rhs
+---@field mode string the mode this mapping belongs to
+---@field noremap boolean the rhs is not remapped
+---@field silent boolean the mapping does not echo
+---@field expr boolean the rhs is an expression producing the keys
+---@field nowait boolean the mapping does not wait for a longer lhs
+---@field buffer boolean the mapping is buffer-local
+---@class liv.std.mapping.list.opts
+---@field mode? string only mappings declared for this mode
+---@field prefix? string only mappings whose lhs starts with this string
 ---@class liv.std.mapping
 ---@field set fun(modes: string|string[], lhs: string, opts?: liv.std.mapping.opts, rhs: string|fun(ctx: liv.std.mapping.ctx): string?): liv.std.mapping.sub
 ---@field del fun(modes: string|string[], lhs: string, opts?: { buffer?: boolean })
+---@field get fun(modes: string|string[], lhs: string, opts?: { buffer?: boolean }): liv.std.mapping.info?
+---@field list fun(opts?: liv.std.mapping.list.opts): liv.std.mapping.info[]
 local core = require("liv.core")
 
-local backend = (core.is_nvim and require("liv.std.mapping._nvim") or require("liv.std.mapping._vim"))(core)
+local backend = (core.is_nvim and require("liv.std.mapping._nvim") or require(
+  "liv.std.mapping._vim"
+))(core)
 
 ---@class liv.std.mapping
 local M = {}
@@ -54,6 +74,25 @@ end
 ---@param opts? { buffer?: boolean }
 function M.del(modes, lhs, opts)
   return backend.del(modes, lhs, opts)
+end
+
+-- Information about an existing mapping for a single mode, or nil if `lhs` is not
+-- mapped there. When `modes` is a list its first element is used (a mapping is
+-- queried one mode at a time). `opts.buffer` queries the buffer-local mapping.
+---@param modes string|string[]
+---@param lhs string
+---@param opts? { buffer?: boolean }
+---@return liv.std.mapping.info?
+function M.get(modes, lhs, opts)
+  return backend.get(modes, lhs, opts or {})
+end
+
+-- All mappings, optionally filtered by `opts.mode` and/or `opts.prefix` (lhs
+-- starts-with). Returns an array of info tables (empty when none match).
+---@param opts? liv.std.mapping.list.opts
+---@return liv.std.mapping.info[]
+function M.list(opts)
+  return backend.list(opts or {})
 end
 
 return M

@@ -14,7 +14,9 @@ local core = require("liv.core")
 local meta_common = require("liv.std.option._generated")
 local meta_plat = core.is_nvim and require("liv.std.option.nvim._generated")
   or require("liv.std.option.vim._generated")
-local backend = (core.is_nvim and require("liv.std.option._nvim") or require("liv.std.option._vim"))(core)
+local backend = (core.is_nvim and require("liv.std.option._nvim") or require("liv.std.option._vim"))(
+  core
+)
 
 local function type_of(name)
   local m = meta_common[name] or meta_plat[name]
@@ -41,6 +43,19 @@ local function make_scope(scope)
     backend.set(scope, name, value, type_of(name), target)
   end
 
+  -- Reset an option to its default value within this scope. The reset is
+  -- current-context: `g` resets the GLOBAL default (the value `g.get` reads), and
+  -- `b`/`w`/`l` reset the LOCAL default for the current buffer/window (the value
+  -- those scopes read). The `target` arg only accepts the current handle (nil/0);
+  -- a non-current target has no native reset on either editor, so it raises rather
+  -- than silently resetting the wrong context.
+  function raw.reset(name, target)
+    if target ~= nil and target ~= 0 then
+      error("option." .. scope .. ".reset does not support a non-current target")
+    end
+    backend.reset(scope, name)
+  end
+
   return setmetatable(raw, {
     __index = function(_, name)
       return raw.get(name)
@@ -57,6 +72,7 @@ end
 ---@class liv.std.option.Scope : liv.std.option.Common
 ---@field get fun(name: string, target?: integer): boolean|integer|string
 ---@field set fun(name: string, value: boolean|integer|string, target?: integer)
+---@field reset fun(name: string, target?: integer) reset to default (current context only)
 ---@class liv.std.option.VimScope : liv.std.option.Vim
 ---@field get fun(name: string): boolean|integer|string
 ---@field set fun(name: string, value: boolean|integer|string)

@@ -97,6 +97,58 @@ describe("liv.std.ui (L3)", function()
     assert.equal("x", got)
   end)
 
+  it("prompt accepts a completion function without breaking the prompt", function()
+    -- Vim-strong / Neovim-best-effort: on Vim the completion fn is wired to a
+    -- customlist completion function via the dispatch and drives input(); on Neovim
+    -- a Lua completion fn cannot be honored by the default vim.ui.input (its
+    -- documented `completion` is a -complete= type STRING, and forwarding a Funcref
+    -- to vim.fn.input raises E729), so it is not forwarded. Either way the entered
+    -- text still reaches the handler — prompt itself always works.
+    local got
+    local completion = function(_lead)
+      return { "alpha", "beta" }
+    end
+    if core.is_nvim then
+      local orig = vim.ui.input
+      local captured
+      vim.ui.input = function(opts, on_confirm)
+        captured = opts
+        on_confirm("typed")
+      end
+      ui.prompt({ prompt = "name: ", completion = completion }, function(text)
+        got = text
+      end)
+      vim.ui.input = orig
+      -- A Lua completion fn is not forwarded on Neovim (it cannot be honored by the
+      -- default vim.ui.input, which expects a -complete= type string).
+      assert.is_nil(captured.completion)
+    else
+      core.call("feedkeys", core.eval([["typed\<CR>"]]), "t")
+      ui.prompt({ prompt = "name: ", completion = completion }, function(text)
+        got = text
+      end)
+    end
+    assert.equal("typed", got)
+  end)
+
+  it("the Vim completion forwarder returns the candidates when invoked by name", function()
+    -- Vim only: the dispatch builds a customlist completion function bound to the
+    -- Lua completion handler. We invoke that function by NAME (as the editor would
+    -- when completing) to verify the wiring delivers the candidates, without
+    -- driving interactive Tab (which is not driveable headless). The same dispatch
+    -- forwarder is what ui.prompt assigns to input()'s completion argument.
+    if core.is_nvim then
+      return
+    end
+    local dispatch = require("liv.std._dispatch")(core)
+    local id, name = dispatch.register_complete(function(lead, _cmdline, _cursorpos)
+      return { lead .. "alpha", lead .. "beta" }
+    end)
+    local candidates = core.call(name, "x", "", 0)
+    assert.same({ "xalpha", "xbeta" }, candidates)
+    dispatch.unregister(id)
+  end)
+
   it("select handler receives nil when cancelled", function()
     -- popup_menu's Esc/cancel cannot be driven in headless `vim -es` (it blocks
     -- on the filter), so the cancel->nil mapping is asserted on Neovim via the

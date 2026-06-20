@@ -23,7 +23,9 @@
 ---@field remove fun(name: string)
 local core = require("liv.core")
 
-local backend = (core.is_nvim and require("liv.std.command._nvim") or require("liv.std.command._vim"))(core)
+local backend = (core.is_nvim and require("liv.std.command._nvim") or require(
+  "liv.std.command._vim"
+))(core)
 
 ---@class liv.std.command
 local M = {}

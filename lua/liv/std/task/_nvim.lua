@@ -1,7 +1,7 @@
 -- liv.std.task Neovim leaves: the editor-dependent primitives injected into the
 -- pure liv.lua.async engine. schedule resumes on the main loop; timer is a
 -- one-shot libuv timer returning a canceler; wait synchronously pumps the loop.
-return function(core)
+return function(_core)
   local M = {}
 
   ---@param fn fun()

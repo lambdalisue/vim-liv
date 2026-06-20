@@ -7,7 +7,7 @@
 -- `bufname`, keeping the cross-editor surface aligned with that familiar
 -- vocabulary; and (2) it is the naming convention for editor buffer names, used
 -- alongside the editor-dependent `liv.std.buffer` module. It has no backend and
--- no `liv.has` gate — `init.lua` is a plain re-export of the pure impl.
+-- no `liv.std.has` gate — `init.lua` is a plain re-export of the pure impl.
 ---@class liv.std.bufname
 ---@field format fun(bufname: liv.std.bufname.Bufname): string
 ---@field parse fun(str: string): liv.std.bufname.Bufname

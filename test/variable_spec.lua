@@ -62,4 +62,30 @@ describe("liv.std.variable (L3)", function()
     var.v.set("errmsg", "liv-vvar-test")
     assert.equal("liv-vvar-test", var.v.get("errmsg"))
   end)
+
+  it("register scope round-trips contents", function()
+    var.r.set("a", "hello_reg")
+    assert.equal("hello_reg", var.r.get("a"))
+  end)
+
+  it("an unused register reads as an empty string, not nil", function()
+    -- A register is never "undefined" -- it is a slot that is always present,
+    -- just empty. So the missing-value here is "", unlike g/b/w/t/v's nil.
+    var.r.set("z", "")
+    assert.equal("", var.r.get("z"))
+  end)
+
+  it("env scope round-trips a value", function()
+    var.env.set("LIV_TEST_VAR", "env_probe")
+    assert.equal("env_probe", var.env.get("LIV_TEST_VAR"))
+  end)
+
+  it("an unset env var reads as nil", function()
+    assert.is_nil(var.env.get("LIV_DEFINITELY_UNSET_XYZ"))
+  end)
+
+  it("an env var set to an empty string is distinct from unset", function()
+    var.env.set("LIV_TEST_EMPTY", "")
+    assert.equal("", var.env.get("LIV_TEST_EMPTY"))
+  end)
 end)

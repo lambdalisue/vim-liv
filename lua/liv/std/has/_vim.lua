@@ -1,17 +1,23 @@
--- liv.has Vim backend: power features depend on Vim's compile-time features and
+-- liv.std.has Vim backend: power features depend on Vim's compile-time features and
 -- version, probed once via has(). Vim has no true-async filesystem (no libuv), so
 -- "fs.async" is false; marks ride on text properties (Vim 9.0+), floats on the
 -- popup window feature, and fetch on an external curl/wget being installed.
 return function(core)
+  -- Bind the builtins as marshaled references (the same pattern the _nvim backend
+  -- and every other _vim backend use), rather than building an eval string per
+  -- probe: marshaling stays in core and there is no string-interpolation seam.
+  local vim_has = core.marshaled(vim.fn.has)
+  local vim_executable = core.marshaled(vim.fn.executable)
   local function has(feat)
-    return core.eval("has('" .. feat .. "')") == 1
+    return vim_has(feat) == 1
   end
   local function executable(cmd)
-    return core.eval("executable('" .. cmd .. "')") == 1
+    return vim_executable(cmd) == 1
   end
 
   local textprop = has("textprop")
   local popup = has("popupwin")
+  local has_curl = executable("curl")
 
   local FEATURES = {
     ["async"] = true,
@@ -25,11 +31,15 @@ return function(core)
     -- Named highlight groups via hlset() are always present on a Vim that links
     -- Lua (the function landed long before Lua support).
     ["highlight"] = true,
+    -- Terminal Vim hides/shows via t_ve/t_vi; GUI Vim degrades (uses guicursor).
+    ["cursor.hide"] = true,
     ["fs.async"] = false,
     -- Streaming spawn rides on the job/channel API (Vim 8.0+ jobs, always
     -- present on a Vim that links Lua), with 'nl' line mode for per-line output.
     ["process.stream"] = has("job"),
-    ["fetch"] = executable("curl") or executable("wget"),
+    ["fetch"] = has_curl or executable("wget"),
+    -- Multipart form upload needs curl; wget has no clean multipart support.
+    ["fetch.form"] = has_curl,
   }
 
   ---@param feature liv.feature|string

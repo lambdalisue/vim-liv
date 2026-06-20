@@ -6,9 +6,9 @@
 -- the wrappers ignore. wait pumps the loop with :sleep, which processes timers in
 -- headless (-es) too.
 return function(core)
-  local fn = vim.fn
-  local timer_start = core.marshaled(fn.timer_start)
-  local timer_stop = core.marshaled(fn.timer_stop)
+  local vimfn = vim.fn
+  local timer_start = core.marshaled(vimfn.timer_start)
+  local timer_stop = core.marshaled(vimfn.timer_stop)
 
   local M = {}
 

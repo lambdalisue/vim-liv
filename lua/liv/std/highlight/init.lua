@@ -31,4 +31,6 @@
 local core = require("liv.core")
 
 ---@type liv.std.highlight
-return (core.is_nvim and require("liv.std.highlight._nvim") or require("liv.std.highlight._vim"))(core)
+return (core.is_nvim and require("liv.std.highlight._nvim") or require("liv.std.highlight._vim"))(
+  core
+)

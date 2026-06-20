@@ -48,12 +48,15 @@ end
 ---@param def liv.std.sign.def
 function M.define(name, def)
   def = def or {}
-  sign_define(name, core.dict({
-    text = def.text,
-    texthl = def.text_hl,
-    linehl = def.line_hl,
-    numhl = def.num_hl,
-  }))
+  sign_define(
+    name,
+    core.dict({
+      text = def.text,
+      texthl = def.text_hl,
+      linehl = def.line_hl,
+      numhl = def.num_hl,
+    })
+  )
 end
 
 ---@param buf integer
@@ -63,21 +66,27 @@ end
 ---@return integer id
 function M.place(buf, line, name, opts)
   opts = opts or {}
-  local bufnr = resolve(buf)
+  local resolved = resolve(buf)
   local group = opts.group or ""
   seq = seq + 1
   local id = seq
-  sign_place(id, group, name, bufnr, core.dict({
-    lnum = line,
-    priority = opts.priority,
-  }))
-  placed[id] = { bufnr = bufnr, group = group }
+  sign_place(
+    id,
+    group,
+    name,
+    resolved,
+    core.dict({
+      lnum = line,
+      priority = opts.priority,
+    })
+  )
+  placed[id] = { bufnr = resolved, group = group }
   return id
 end
 
 ---@param buf integer
 ---@param id integer
-function M.remove(buf, id)
+function M.remove(_buf, id)
   local info = placed[id]
   if not info then
     return
@@ -90,10 +99,10 @@ end
 ---@param opts? { group?: string }
 function M.clear(buf, opts)
   opts = opts or {}
-  local bufnr = resolve(buf)
+  local resolved = resolve(buf)
   local ids = {}
   for id, info in pairs(placed) do
-    if info.bufnr == bufnr and (not opts.group or info.group == opts.group) then
+    if info.bufnr == resolved and (not opts.group or info.group == opts.group) then
       ids[#ids + 1] = id
     end
   end
@@ -107,15 +116,16 @@ end
 ---@return liv.std.sign.placement[]
 function M.placed(buf, opts)
   opts = opts or {}
-  local bufnr = resolve(buf)
-  local result = sign_getplaced(bufnr, core.dict({ group = opts.group or "*" }))
+  local resolved = resolve(buf)
+  local result = sign_getplaced(resolved, core.dict({ group = opts.group or "*" }))
   local out = {}
   local entry = result[1]
   local signs = entry and entry.signs
   if signs then
     for i = 1, #signs do
       local s = signs[i]
-      out[#out + 1] = { id = s.id, line = s.lnum, name = s.name, group = s.group, priority = s.priority }
+      out[#out + 1] =
+        { id = s.id, line = s.lnum, name = s.name, group = s.group, priority = s.priority }
     end
   end
   return out

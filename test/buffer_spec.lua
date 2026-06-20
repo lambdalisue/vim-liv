@@ -105,3 +105,82 @@ describe("liv.std.buffer lifecycle (L3)", function()
     buffer.wipe(999999)
   end)
 end)
+
+describe("liv.std.buffer.with (L3)", function()
+  before_each(function()
+    -- Scope away from a MODIFIED current buffer on purpose: this is the realistic
+    -- case (you are editing a buffer and want to act on another), and on Vim a
+    -- modified current buffer would block a plain no-bang `:buffer` switch — so
+    -- this pins that `with` keeps the abandoned buffer (via `hide`).
+    core.cmd("enew!")
+    core.call("setline", 1, core.list({ "dirty" }))
+  end)
+
+  it("runs fn with buf as the current buffer, then restores the previous one", function()
+    local a = core.call("bufnr", "%")
+    local b = buffer.create({})
+    local inside
+    buffer.with(b, function()
+      inside = core.call("bufnr", "%")
+      -- Modify b inside the scope: this leaves b dirty so the switch BACK is also
+      -- from a modified buffer (exercising `hide` on the restore, not just the
+      -- switch-in), and lets us assert the edit round-tripped.
+      buffer.set_lines(b, 1, buffer.count(b), { "written inside with" })
+    end)
+    assert.equal(b, inside) -- fn saw b as current
+    assert.equal(a, core.call("bufnr", "%")) -- previous buffer restored after
+    assert.same({ "written inside with" }, buffer.lines(b, 1, buffer.count(b))) -- edit persisted
+    buffer.wipe(b)
+  end)
+
+  it("returns fn's return value", function()
+    local b = buffer.create({})
+    local result = buffer.with(b, function()
+      return 42
+    end)
+    assert.equal(42, result)
+    buffer.wipe(b)
+  end)
+
+  it("restores the previous buffer even when fn errors, and re-raises", function()
+    local a = core.call("bufnr", "%")
+    local b = buffer.create({})
+    assert.has_error(function()
+      buffer.with(b, function()
+        error("boom")
+      end)
+    end)
+    assert.equal(a, core.call("bufnr", "%")) -- still restored despite the error
+    buffer.wipe(b)
+  end)
+end)
+
+describe("liv.std.buffer.modifiable (L3)", function()
+  it("temporarily enables 'modifiable' so a read-only buffer can be edited", function()
+    local b = buffer.create({})
+    buffer.set_lines(b, 1, buffer.count(b), { "locked" })
+    core.call("setbufvar", b, "&modifiable", 0)
+
+    local result = buffer.modifiable(b, function()
+      buffer.set_lines(b, 1, buffer.count(b), { "edited" })
+      return "ok"
+    end)
+
+    assert.equal("ok", result) -- returns fn's value
+    assert.same({ "edited" }, buffer.lines(b, 1, buffer.count(b))) -- the line was written
+    assert.equal(0, core.call("getbufvar", b, "&modifiable")) -- 'modifiable' restored to false
+    buffer.wipe(b)
+  end)
+
+  it("restores 'modifiable' even when fn errors, and re-raises", function()
+    local b = buffer.create({})
+    core.call("setbufvar", b, "&modifiable", 0)
+    assert.has_error(function()
+      buffer.modifiable(b, function()
+        error("boom")
+      end)
+    end)
+    assert.equal(0, core.call("getbufvar", b, "&modifiable")) -- restored despite the error
+    buffer.wipe(b)
+  end)
+end)

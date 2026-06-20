@@ -23,6 +23,9 @@ return function(core)
   local setbufvar = core.marshaled(fn.setbufvar)
   local setwinvar = core.marshaled(fn.setwinvar)
   local settabvar = core.marshaled(fn.settabvar)
+  local getreg = core.marshaled(fn.getreg)
+  local setreg = core.marshaled(fn.setreg)
+  local setenv = core.marshaled(fn.setenv)
 
   local M = { get = {}, set = {} }
 
@@ -104,6 +107,37 @@ return function(core)
     local json = json_encode(value)
     local literal = "'" .. json:gsub("'", "''") .. "'"
     core.cmd("let v:" .. name .. " = json_decode(" .. literal .. ")")
+  end
+
+  -- Registers always exist as slots, so getreg yields "" (not nil) for an empty
+  -- one -- the missing-value here is "", unlike the nil-for-undefined scopes.
+  ---@param name string
+  ---@return string
+  M.get.register = function(name)
+    return getreg(name)
+  end
+  ---@param name string
+  ---@param value string
+  M.set.register = function(name, value)
+    setreg(name, value)
+  end
+
+  -- Environment: distinguish unset from set-empty via exists('$VAR'). An unset
+  -- var returns nil; otherwise eval('$VAR') yields the plain value ("" for a
+  -- set-but-empty var). This sidesteps getenv's v:null -> core.NIL marshaling,
+  -- which would not equal Lua nil.
+  ---@param name string
+  ---@return string|nil
+  M.get.env = function(name)
+    if exists("$" .. name) == 0 then
+      return nil
+    end
+    return core.eval("$" .. name)
+  end
+  ---@param name string
+  ---@param value string
+  M.set.env = function(name, value)
+    setenv(name, value)
   end
 
   return M

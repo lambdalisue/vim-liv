@@ -8,7 +8,9 @@
 local core = require("liv.core")
 local async = require("liv.lua.async")
 
-local leaves = (core.is_nvim and require("liv.std.task._nvim") or require("liv.std.task._vim"))(core)
+local leaves = (core.is_nvim and require("liv.std.task._nvim") or require("liv.std.task._vim"))(
+  core
+)
 
 -- A running-task handle returned by run. Fields are filled in as the task
 -- progresses; cancel stops it.

@@ -18,13 +18,35 @@ return function(core)
     return name
   end
 
+  -- General form: register the handler under a dispatch id (which marshals
+  -- arbitrary args in and the return out) and bind a uniquely-named g: Funcref
+  -- partial to g:LivInvoke with that id curried. Calling g:LivNamed{id}(...) thus
+  -- routes to g:LivInvoke(id, ...), forwarding any arity — including zero — to the
+  -- Lua handler. The returned name is callable as the head of a vimscript call
+  -- expression (e.g. core.eval(name .. "(a, b)")).
+  ---@param handler fun(...): any
+  ---@return string func_name
+  function M.named(handler)
+    local id = dispatch.register(handler)
+    local name = "g:LivNamed" .. id
+    -- id is a numeric dispatch counter (digits only), so direct interpolation
+    -- into the let-expression is injection-safe; no quoting helper needed.
+    core.cmd(string.format("let %s = function('g:LivInvoke', ['%s'])", name, id))
+    ids[name] = id
+    return name
+  end
+
   -- Symmetric removal: unregister the handler the name forwards to. Idempotent —
   -- a name already released (or never ours) is a no-op. The dispatch entry is
-  -- dropped so the held Funcref is freed.
-  ---@param name string a value previously returned by function_name
+  -- dropped so the held Funcref is freed; for a named() binding the g: Funcref
+  -- partial is also unlet so its slot does not linger.
+  ---@param name string a value previously returned by function_name or named
   function M.release(name)
     if ids[name] then
       dispatch.unregister(ids[name])
+      if name:sub(1, #"g:LivNamed") == "g:LivNamed" then
+        core.cmd("unlet! " .. name)
+      end
       ids[name] = nil
     end
   end

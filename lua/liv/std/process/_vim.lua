@@ -24,11 +24,21 @@ return function(core)
   core.cmd("source " .. here:gsub("%.lua$", ".vim"))
 
   ---@param cmd string[]
+  ---@param spawn_opts liv.std.process.spawn_opts?
   ---@param on_done fun(result: liv.std.process.Result)
   ---@return fun() canceler
-  function M.spawn(cmd, on_done)
+  function M.spawn(cmd, spawn_opts, on_done)
+    spawn_opts = spawn_opts or {}
     local out, err = {}, {}
     local opts = vim.dict({ out_mode = "raw", err_mode = "raw" })
+    if spawn_opts.cwd ~= nil then
+      opts.cwd = spawn_opts.cwd
+    end
+    if spawn_opts.env ~= nil then
+      -- env EXTENDS the parent environment: Vim's job_start {env} adds these on
+      -- top of the inherited variables.
+      opts.env = vim.dict(spawn_opts.env)
+    end
     opts.out_cb = function(_ch, msg)
       out[#out + 1] = msg
     end
@@ -76,8 +86,16 @@ return function(core)
       end
     end
 
-    local id = core.call("LivProcStart", cmd, out_cb, err_cb, exit_cb)
+    -- cwd/env cross as real marshaled args (NIL when absent so the companion's
+    -- type() guard skips them); env EXTENDS the parent environment.
+    local cwd = opts.cwd ~= nil and opts.cwd or core.NIL
+    local env = opts.env ~= nil and core.dict(opts.env) or core.NIL
 
+    local id = core.call("LivProcStart", cmd, out_cb, err_cb, exit_cb, cwd, env)
+
+    local function kill()
+      core.call("LivProcStop", id)
+    end
     return {
       write = function(data)
         core.call("LivProcSend", id, data)
@@ -87,9 +105,8 @@ return function(core)
         -- and can finish; does not stop an already-running process.
         core.call("LivProcCloseIn", id)
       end,
-      kill = function()
-        core.call("LivProcStop", id)
-      end,
+      kill = kill,
+      stop = kill, -- alias
     }
   end
 

@@ -13,10 +13,14 @@ return function(_core)
   local M = {}
 
   ---@param cmd string[]
+  ---@param opts liv.std.process.spawn_opts?
   ---@param on_done fun(result: liv.std.process.Result)
   ---@return fun() canceler
-  function M.spawn(cmd, on_done)
-    local handle = vim.system(cmd, {}, function(obj)
+  function M.spawn(cmd, opts, on_done)
+    opts = opts or {}
+    -- env EXTENDS the parent environment: vim.system merges by default
+    -- (clear_env unset), so the child keeps inherited vars plus these.
+    local handle = vim.system(cmd, { cwd = opts.cwd, env = opts.env }, function(obj)
       on_done({
         code = obj.code,
         stdout = obj.stdout or "",
@@ -68,12 +72,21 @@ return function(_core)
         opts.on_exit({ code = code })
       end
     end
+    -- cwd/env are spawn options; env EXTENDS the parent environment (jobstart
+    -- merges unless clear_env is set), matching the one-shot spawn contract.
+    jobopts.cwd = opts.cwd
+    jobopts.env = opts.env
 
     local id = vim.fn.jobstart(cmd, jobopts)
     if id <= 0 then
-      error("liv.std.process.open: failed to start command (jobstart returned " .. tostring(id) .. ")")
+      error(
+        "liv.std.process.open: failed to start command (jobstart returned " .. tostring(id) .. ")"
+      )
     end
 
+    local function kill()
+      vim.fn.jobstop(id)
+    end
     return {
       write = function(data)
         vim.fn.chansend(id, data)
@@ -83,9 +96,8 @@ return function(_core)
         -- can finish; does not stop an already-running process.
         vim.fn.chanclose(id, "stdin")
       end,
-      kill = function()
-        vim.fn.jobstop(id)
-      end,
+      kill = kill,
+      stop = kill, -- alias
     }
   end
 

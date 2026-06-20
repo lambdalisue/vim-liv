@@ -15,7 +15,7 @@ return function(core)
   local prop_add = core.marshaled(fn.prop_add)
   local prop_remove = core.marshaled(fn.prop_remove)
 
-  local has = require("liv.has")
+  local has = require("liv.std.has")
   local seq = 0
   local marks = {} -- id -> { bufnr = integer, types = string[] }
   local registered = {} -- prop type name -> true
@@ -49,23 +49,23 @@ return function(core)
     if opts.hl and not has("mark") then
       error("liv.std.mark: text marks are not available on this editor")
     end
-    local bufnr = resolve(buf)
+    local resolved = resolve(buf)
     seq = seq + 1
     local id = seq
     local types = {}
     if opts.hl then
       local t = ensure_type("liv_mark_hl_" .. opts.hl, opts.hl)
-      local text = getbufline(bufnr, line)[1] or ""
-      prop_add(line, 1, core.dict({ bufnr = bufnr, type = t, length = #text, id = id }))
+      local text = getbufline(resolved, line)[1] or ""
+      prop_add(line, 1, core.dict({ bufnr = resolved, type = t, length = #text, id = id }))
       types[#types + 1] = t
     end
     if opts.virt_text then
       local group = opts.virt_text_hl or opts.hl or "Normal"
       local t = ensure_type("liv_mark_vt_" .. group, group)
-      prop_add(line, 0, core.dict({ bufnr = bufnr, type = t, text = opts.virt_text, id = id }))
+      prop_add(line, 0, core.dict({ bufnr = resolved, type = t, text = opts.virt_text, id = id }))
       types[#types + 1] = t
     end
-    marks[id] = { bufnr = bufnr, types = types }
+    marks[id] = { bufnr = resolved, types = types }
     return id
   end
 
@@ -82,7 +82,7 @@ return function(core)
     if not opts.hl then
       error("liv.std.mark: range requires opts.hl")
     end
-    local bufnr = resolve(buf)
+    local resolved = resolve(buf)
     seq = seq + 1
     local id = seq
     local t = ensure_type("liv_mark_range_" .. opts.hl, opts.hl)
@@ -95,22 +95,26 @@ return function(core)
       if ln == to[1] then
         end_col = to[2] + 1
       else
-        local text = getbufline(bufnr, ln)[1] or ""
+        local text = getbufline(resolved, ln)[1] or ""
         end_col = #text + 1
       end
       -- A zero-width span (e.g. start of an empty interior line) has nothing to
       -- color; Vim rejects such a property, so skip it.
       if end_col > start_col then
-        prop_add(ln, start_col, core.dict({ bufnr = bufnr, type = t, end_col = end_col, id = id }))
+        prop_add(
+          ln,
+          start_col,
+          core.dict({ bufnr = resolved, type = t, end_col = end_col, id = id })
+        )
       end
     end
-    marks[id] = { bufnr = bufnr, types = { t } }
+    marks[id] = { bufnr = resolved, types = { t } }
     return id
   end
 
   ---@param buf integer
   ---@param id integer
-  function M.remove(buf, id)
+  function M.remove(_buf, id)
     local info = marks[id]
     if not info then
       return
@@ -123,10 +127,10 @@ return function(core)
 
   ---@param buf integer
   function M.clear(buf)
-    local bufnr = resolve(buf)
+    local resolved = resolve(buf)
     local ids = {}
     for id, info in pairs(marks) do
-      if info.bufnr == bufnr then
+      if info.bufnr == resolved then
         ids[#ids + 1] = id
       end
     end

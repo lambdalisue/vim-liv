@@ -67,5 +67,16 @@ return function(core)
     core.cmd("let &" .. sigil .. name .. " = " .. expr)
   end
 
+  -- Reset to default. `g` resets the global default (`setglobal name&`, matching
+  -- `&g:name`); `b`/`w`/`l` reset the current-buffer/window local default
+  -- (`setlocal name&`, matching the local value those scopes read).
+  function M.reset(scope, name)
+    if scope == "g" then
+      core.cmd("setglobal " .. name .. "&")
+    else
+      core.cmd("setlocal " .. name .. "&")
+    end
+  end
+
   return M
 end

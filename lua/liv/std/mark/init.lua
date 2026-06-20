@@ -2,7 +2,7 @@
 -- place() decorates a whole line (line highlight and/or virtual text shown after
 -- the line); range() highlights an intra-line column span, optionally spanning
 -- multiple lines. Both are power features: they raise if the requested decoration
--- is unavailable on the current editor, so authors gate with liv.has and degrade
+-- is unavailable on the current editor, so authors gate with liv.std.has and degrade
 -- intentionally rather than fail silently. Neovim uses extmarks; Vim uses text
 -- properties. Both return an opaque id to pass back to remove(); clear() drops
 -- every liv mark in a buffer. Handles follow liv's convention: buf 0/nil means the

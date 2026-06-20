@@ -1,10 +1,10 @@
--- L3 integration test for liv.has (spec 0006), on both editors. Asserts the
+-- L3 integration test for liv.std.has (spec 0006), on both editors. Asserts the
 -- shape and the cross-editor contract: base features are available everywhere,
 -- true-async fs is Neovim-only, and unknown keys report false.
-local has = require("liv.has")
+local has = require("liv.std.has")
 local core = require("liv.core")
 
-describe("liv.has (L3)", function()
+describe("liv.std.has (L3)", function()
   it("reports base features available on both editors", function()
     assert.is_true(has("async"))
     assert.is_true(has("popup"))

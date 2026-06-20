@@ -101,5 +101,57 @@ return function(core)
     pcall(buf_delete, buf or 0, core.dict({ force = true }))
   end
 
+  -- Resolve 0/nil to a concrete buffer id for the buffer-local option index
+  -- (vim.bo[0] would target the *current* buffer rather than a stable id, which
+  -- is wrong once we have changed it; resolve up front).
+  local current_buf = vim.api.nvim_get_current_buf
+
+  ---Run fn with buf as the current buffer, then restore the previously-current
+  ---buffer, even if fn errors. Returns fn's value.
+  ---
+  ---nvim_buf_call already runs the callback with buf current and restores the
+  ---prior buffer afterward (including on error), so this is a thin native pass —
+  ---no manual save/restore needed.
+  ---
+  ---The callback is NOT routed through core.marshaled: the boundary here is
+  ---Lua↔Lua (a plain Lua callback and its plain Lua return), not an editor-value
+  ---boundary, so marshaling would mangle a returned table. The _nvim backend is
+  ---allowed to call vim.api directly; this is that case.
+  ---@generic T
+  ---@param buf integer? buffer handle; 0/nil = current
+  ---@param fn fun(): T
+  ---@return T
+  function M.with(buf, fn)
+    return vim.api.nvim_buf_call(resolve(buf), fn)
+  end
+
+  ---Run fn with buf's 'modifiable' temporarily enabled (and 'readonly' cleared),
+  ---restoring both options afterward even if fn errors. Returns fn's value. This
+  ---is the "edit a normally-read-only buffer" pattern. Uses vim.bo[buf] because
+  ---nvim_buf_set_option is deprecated on recent Neovim; options are scalars, so
+  ---no marshaling is involved.
+  ---@generic T
+  ---@param buf integer? buffer handle; 0/nil = current
+  ---@param fn fun(): T
+  ---@return T
+  function M.modifiable(buf, fn)
+    local id = resolve(buf)
+    if id == 0 then
+      id = current_buf()
+    end
+    local bo = vim.bo[id]
+    local saved_modifiable = bo.modifiable
+    local saved_readonly = bo.readonly
+    bo.modifiable = true
+    bo.readonly = false
+    local ok, result = pcall(fn)
+    bo.modifiable = saved_modifiable
+    bo.readonly = saved_readonly
+    if not ok then
+      error(result, 0) -- re-raise without re-prefixing the position
+    end
+    return result
+  end
+
   return M
 end

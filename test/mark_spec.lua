@@ -4,7 +4,7 @@
 -- lifecycle. The scratch buffer is fresh, so a total property count equals liv's
 -- marks on the Vim side.
 local mark = require("liv.std.mark")
-local has = require("liv.has")
+local has = require("liv.std.has")
 local core = require("liv.core")
 
 local function count()

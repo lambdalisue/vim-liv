@@ -61,7 +61,10 @@ return function(core)
   ---@param win integer
   ---@param pos { line: integer, col: integer }
   function M.move(win, pos)
-    set_config(win, core.dict({ relative = "editor", row = (pos.line or 1) - 1, col = (pos.col or 1) - 1 }))
+    set_config(
+      win,
+      core.dict({ relative = "editor", row = (pos.line or 1) - 1, col = (pos.col or 1) - 1 })
+    )
   end
 
   ---@param win integer

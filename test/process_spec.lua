@@ -38,14 +38,64 @@ describe("liv.std.process (L3)", function()
       return process.system({ "sleep", "5" })
     end)
     -- pump briefly so the process actually starts, then cancel
-    task.block(task.run(function()
-      task.sleep(50)
-      return true
-    end), 1000)
+    task.block(
+      task.run(function()
+        task.sleep(50)
+        return true
+      end),
+      1000
+    )
     handle.cancel()
     assert.is_true(handle.done)
     assert.is_false(handle.ok)
     assert.equal("cancelled", handle.result)
+  end)
+
+  it("runs the child in opts.cwd", function()
+    -- /tmp and /var are symlinks on macOS, so canonicalize both sides: compare
+    -- the child's physical cwd (pwd -P) against the resolved temp dir.
+    local dir = vim.fn.resolve(vim.fn.fnamemodify(vim.fn.tempname(), ":h"))
+    local handle = task.run(function()
+      return process.system({ "sh", "-c", "pwd -P" }, { cwd = dir })
+    end)
+    task.block(handle, 3000)
+    assert.equal(0, handle.result.code)
+    assert.equal(dir, (handle.result.stdout:gsub("%s+$", "")))
+  end)
+
+  it("extends the environment with opts.env", function()
+    -- Echo both a parent var ($HOME) and the injected one: a surviving $HOME
+    -- proves env EXTENDS rather than REPLACES the parent environment.
+    local handle = task.run(function()
+      return process.system({ "sh", "-c", "echo $HOME:$LIV_PROC_ENV" }, {
+        env = { LIV_PROC_ENV = "proc_probe" },
+      })
+    end)
+    task.block(handle, 3000)
+    assert.equal(0, handle.result.code)
+    local home, probe = handle.result.stdout:match("^(.-):(.-)%s*$")
+    assert.is_true(home ~= nil and home ~= "")
+    assert.equal("proc_probe", probe)
+  end)
+end)
+
+describe("liv.std.process.run (L3 sync one-shot)", function()
+  it("runs a command to completion synchronously without an async context", function()
+    local r = process.run({ "sh", "-c", "echo sync_probe" })
+    assert.equal(0, r.code)
+    assert.equal("sync_probe", (r.stdout:gsub("%s+$", "")))
+  end)
+
+  it("honours cwd and env synchronously", function()
+    local dir = vim.fn.resolve(vim.fn.fnamemodify(vim.fn.tempname(), ":h"))
+    local r = process.run({ "sh", "-c", "pwd -P; echo $LIV_PROC_ENV" }, {
+      cwd = dir,
+      env = { LIV_PROC_ENV = "run_probe" },
+    })
+    assert.equal(0, r.code)
+    local cwd, probe = r.stdout:match("^(.-)\n(.-)%s*$")
+    assert.equal(dir, cwd)
+    assert.equal("run_probe", probe)
   end)
 end)
 
@@ -113,8 +163,51 @@ describe("liv.std.process.open (L3 streaming)", function()
     assert.is_true(exited)
   end)
 
+  it("opens the streaming child in opts.cwd with opts.env", function()
+    local dir = vim.fn.resolve(vim.fn.fnamemodify(vim.fn.tempname(), ":h"))
+    local lines = {}
+    local exited = false
+    process.open({ "sh", "-c", 'pwd -P; echo "$HOME:$LIV_PROC_ENV"' }, {
+      cwd = dir,
+      env = { LIV_PROC_ENV = "open_probe" },
+      on_stdout = function(line)
+        lines[#lines + 1] = line
+      end,
+      on_exit = function()
+        exited = true
+      end,
+    })
+    pump_until(function()
+      return exited
+    end)
+    assert.is_true(exited)
+    assert.equal(dir, lines[1])
+    -- A surviving $HOME proves env EXTENDS rather than REPLACES on the streaming
+    -- path too (jobstart on nvim vs job_start on Vim), matching system/run.
+    local home, probe = lines[2]:match("^(.-):(.-)$")
+    assert.is_true(home ~= nil and home ~= "")
+    assert.equal("open_probe", probe)
+  end)
+
+  it("kill() terminates a long-running child that reads stdin forever", function()
+    local exited = false
+    local handle = process.open({ "cat" }, {
+      on_stdout = function() end,
+      on_exit = function()
+        exited = true
+      end,
+    })
+    -- cat blocks on stdin indefinitely; kill must make on_exit fire.
+    assert.is_false(exited)
+    handle.kill()
+    pump_until(function()
+      return exited
+    end)
+    assert.is_true(exited)
+  end)
+
   it("reports streaming support on both editors", function()
-    local has = require("liv.has")
+    local has = require("liv.std.has")
     assert.is_true(has("process.stream"))
   end)
 end)

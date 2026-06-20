@@ -7,6 +7,7 @@ return function(core)
   local del_au = core.marshaled(vim.api.nvim_del_autocmd)
   local exec_au = core.marshaled(vim.api.nvim_exec_autocmds)
   local create_augroup = core.marshaled(vim.api.nvim_create_augroup)
+  local get_au = core.marshaled(vim.api.nvim_get_autocmds)
 
   local M = {}
 
@@ -54,6 +55,37 @@ return function(core)
   ---@param name string the User event name to fire
   function M.trigger(name)
     exec_au("User", core.dict({ pattern = name, modeline = false }))
+  end
+
+  ---@param opts? liv.std.autocmd.list.opts
+  ---@return liv.std.autocmd.info[]
+  function M.list(opts)
+    opts = opts or {}
+    -- Pass only `event` to the native query: filtering the group there errors when
+    -- the group never existed (and the `_vim` backend's private-augroup suffix
+    -- would not match the caller's group anyway), so group/pattern are filtered
+    -- client-side for a uniform cross-editor contract.
+    local query = {}
+    if opts.event then
+      query.event = opts.event
+    end
+    local out = {}
+    for _, a in ipairs(get_au(core.dict(query))) do
+      local group = a.group_name
+      local group_ok = opts.group == nil
+        or group == opts.group
+        or (group ~= nil and group:sub(1, #opts.group + 1) == opts.group .. "_")
+      local pattern_ok = opts.pattern == nil or a.pattern == opts.pattern
+      if group_ok and pattern_ok then
+        out[#out + 1] = {
+          event = a.event,
+          pattern = a.pattern,
+          group = group,
+          buffer = a.buffer or 0,
+        }
+      end
+    end
+    return out
   end
 
   return M

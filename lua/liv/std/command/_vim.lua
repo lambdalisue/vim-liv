@@ -35,13 +35,15 @@ return function(core)
       complete_ids[name] = cid
       complete_attr = "-complete=customlist," .. func .. " "
     end
-    core.cmd(string.format(
-      "command! -nargs=%s %s%s %s",
-      tostring(opts.nargs or "*"),
-      complete_attr,
-      name,
-      dispatch.invoke_rhs(id, "<q-args>")
-    ))
+    core.cmd(
+      string.format(
+        "command! -nargs=%s %s%s %s",
+        tostring(opts.nargs or "*"),
+        complete_attr,
+        name,
+        dispatch.invoke_rhs(id, "<q-args>")
+      )
+    )
 
     local removed = false
     return {

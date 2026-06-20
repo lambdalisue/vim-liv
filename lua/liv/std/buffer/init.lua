@@ -14,6 +14,8 @@ local core = require("liv.core")
 ---@field valid fun(buf: integer?): boolean
 ---@field create fun(opts?: { listed?: boolean, scratch?: boolean, name?: string }): integer
 ---@field wipe fun(buf: integer?)
+---@field with fun(buf: integer?, fn: fun(): any): any
+---@field modifiable fun(buf: integer?, fn: fun(): any): any
 
 ---@type liv.std.buffer
 return (core.is_nvim and require("liv.std.buffer._nvim") or require("liv.std.buffer._vim"))(core)

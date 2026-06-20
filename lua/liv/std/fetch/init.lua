@@ -1,7 +1,7 @@
 -- liv.std.fetch — HTTP(S) fetch (spec 0006), a has-gated power feature. Neither
 -- Lua nor the editor builtins provide TLS, so HTTPS is delegated to an external
 -- curl (preferred — full headers/status/redirects) or, if absent, wget (a
--- degraded plain GET). Availability is reported by liv.has("fetch"); fetch()
+-- degraded plain GET). Availability is reported by liv.std.has("fetch"); fetch()
 -- raises when neither tool is present. fetch() is awaitable: call it inside an
 -- async function (liv.std.task.run) — it awaits the subprocess via
 -- liv.std.process and returns the response.
@@ -29,16 +29,28 @@ local M = {}
 
 ---Fetch `url`. Call inside an async function (`task.run`); it awaits the request
 ---and returns the response. Raises if neither curl nor wget is available (gate
----with `liv.has("fetch")`) or if the subprocess fails. With only wget present the
+---with `liv.std.has("fetch")`) or if the subprocess fails. With only wget present the
 ---request degrades to a plain GET — `headers` empty. On either tool, a successful
 ---transfer whose response carries no parseable status line reports `status = 200`
 ---(never nil), so the contract is identical across curl and wget.
+---
+---Request options (see `liv.std.fetch.opts`):
+---  - `output = "<path>"` writes the response body to that file instead of
+---    returning it; the returned `body` is then empty (curl drops the status/
+---    header capture so the file holds only the bytes) and the file holds the
+---    transfer.
+---  - `body = { file = "<path>" }` sends the file's contents as the request body.
+---  - `form = { field = value, ... }` posts multipart/form-data; a value of
+---    `{ file = "<path>" }` uploads that file. Multipart needs curl — on a
+---    wget-only host it raises (gate with `liv.std.has("fetch.form")`).
+---  - `auth`, `proxy`, `insecure`, `http_version` map to the underlying tool's
+---    flags (`http_version` is curl-only and ignored on wget).
 ---@param url string
----@param opts? { method?: string, headers?: table<string,string>, body?: string }
+---@param opts? liv.std.fetch.opts
 ---@return liv.std.fetch.response
 function M.fetch(url, opts)
   if not tool then
-    error("liv.std.fetch: neither curl nor wget is available (check liv.has('fetch'))")
+    error("liv.std.fetch: neither curl nor wget is available (check liv.std.has('fetch'))")
   end
   local res = process.system(argv.build(tool, url, opts))
   if tool == "curl" then

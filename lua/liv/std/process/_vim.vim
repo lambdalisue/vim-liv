@@ -31,15 +31,22 @@ def g:LivProcOnExit(id: string, _job: any, status: number)
 enddef
 
 # Start `cmd` (a list) with line-mode stdout/stderr. OutCb is a Funcref (a Lua
-# function) taking (channel, msg); ErrCb/ExitCb are Funcrefs or v:null. Returns
-# the id.
-def g:LivProcStart(cmd: list<string>, OutCb: any, ErrCb: any, ExitCb: any): string
+# function) taking (channel, msg); ErrCb/ExitCb are Funcrefs or v:null. cwd is a
+# string or v:null; env is a dict or v:null and EXTENDS the parent environment.
+# Returns the id.
+def g:LivProcStart(cmd: list<string>, OutCb: any, ErrCb: any, ExitCb: any, cwd: any, env: any): string
   g:LivProc.counter += 1
   const id = string(g:LivProc.counter)
   var opts: dict<any> = {out_mode: 'nl', err_mode: 'nl'}
   opts.out_cb = OutCb
   if type(ErrCb) == v:t_func
     opts.err_cb = ErrCb
+  endif
+  if type(cwd) == v:t_string
+    opts.cwd = cwd
+  endif
+  if type(env) == v:t_dict
+    opts.env = env
   endif
   g:LivProc.exits[id] = ExitCb
   opts.exit_cb = function('g:LivProcOnExit', [id])

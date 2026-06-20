@@ -17,13 +17,22 @@
 -- liv-owned global table. Either string is a valid value for omnifunc/completefunc
 -- on its editor.
 --
--- `release(name)` is the symmetric removal: pass back a name from function_name to
--- unregister the handler (freeing the held Funcref on Vim / the registry slot on
--- Neovim). It is idempotent — releasing twice, or a name that is not ours, is a
--- no-op on both editors.
+-- `named(handler)` is the general form: it binds a plain Lua function taking ANY
+-- arguments to a Vim-callable function NAME. When the editor evaluates
+-- `name(a, b, c)` in vimscript (an `<expr>` mapping rhs, a dynamically-built
+-- `:execute` string, a function-valued option), `handler(a, b, c)` runs with the
+-- marshaled args and its return is marshaled back. function_name is the
+-- omnifunc-shaped specialization; named covers every other string-only context.
+--
+-- `release(name)` is the symmetric removal: pass back a name from function_name or
+-- named to unregister the handler (freeing the held Funcref on Vim / the registry
+-- slot on Neovim). It is idempotent — releasing twice, or a name that is not ours,
+-- is a no-op on both editors.
 local core = require("liv.core")
 
-local backend = (core.is_nvim and require("liv.std.callback._nvim") or require("liv.std.callback._vim"))(core)
+local backend = (core.is_nvim and require("liv.std.callback._nvim") or require(
+  "liv.std.callback._vim"
+))(core)
 
 ---@class liv.std.callback
 local M = {}
@@ -39,9 +48,21 @@ function M.function_name(handler)
   return backend.function_name(handler)
 end
 
--- Unregister a handler previously bound by function_name, freeing the editor-side
--- forwarder/registry slot. Idempotent on both editors.
----@param name string a value previously returned by function_name
+-- Register `handler` and return a Vim function NAME (a string) that forwards to it
+-- when called as `name(a, b, c)` with ARBITRARY arguments from any vimscript
+-- string-only context. The handler receives plain Lua values and its return is
+-- marshaled back to the editor (so a returned Lua list/dict/number is directly
+-- usable in the calling vimscript expression). The general form of which
+-- function_name is the (findstart, base) omnifunc specialization.
+---@param handler fun(...): any
+---@return string func_name a Vim function name callable as name(...)
+function M.named(handler)
+  return backend.named(handler)
+end
+
+-- Unregister a handler previously bound by function_name or named, freeing the
+-- editor-side forwarder/registry slot. Idempotent on both editors.
+---@param name string a value previously returned by function_name or named
 function M.release(name)
   return backend.release(name)
 end

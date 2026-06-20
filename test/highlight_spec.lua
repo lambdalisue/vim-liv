@@ -5,7 +5,7 @@
 -- strings), so the assertions branch. Distinct fg/bg make a swap regression
 -- visible.
 local highlight = require("liv.std.highlight")
-local has = require("liv.has")
+local has = require("liv.std.has")
 local core = require("liv.core")
 
 describe("liv.std.highlight (L3)", function()

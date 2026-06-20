@@ -58,12 +58,20 @@ describe("liv.std.autocmd (L3)", function()
 
   it("two on() calls with the same group both fire and remove independently", function()
     local a, b = 0, 0
-    local sub_a = autocmd.on("User", { pattern = "LivAuShared", group = "LivAuSharedGrp" }, function()
-      a = a + 1
-    end)
-    local sub_b = autocmd.on("User", { pattern = "LivAuShared", group = "LivAuSharedGrp" }, function()
-      b = b + 1
-    end)
+    local sub_a = autocmd.on(
+      "User",
+      { pattern = "LivAuShared", group = "LivAuSharedGrp" },
+      function()
+        a = a + 1
+      end
+    )
+    local sub_b = autocmd.on(
+      "User",
+      { pattern = "LivAuShared", group = "LivAuSharedGrp" },
+      function()
+        b = b + 1
+      end
+    )
     -- A group is an organizational tag; each on() is its own subscription. Both
     -- fire, and off() removes exactly one, leaving the other intact.
     autocmd.trigger("LivAuShared")
@@ -90,6 +98,29 @@ describe("liv.std.autocmd (L3)", function()
 
   it("trigger with no listener is a no-op", function()
     autocmd.trigger("LivAuNobodyHome")
+  end)
+
+  it("list includes an autocommand filtered by event and group", function()
+    local sub = autocmd.on(
+      "User",
+      { pattern = "LivAuListed", group = "LivAuListGrp" },
+      function() end
+    )
+    local found = false
+    for _, info in ipairs(autocmd.list({ event = "User", group = "LivAuListGrp" })) do
+      if info.pattern == "LivAuListed" then
+        found = true
+        assert.equal("User", info.event)
+      end
+    end
+    assert.is_true(found)
+    sub.off()
+  end)
+
+  it("list returns an empty table when nothing matches", function()
+    local result = autocmd.list({ event = "User", pattern = "LivAuNeverRegistered" })
+    assert.equal("table", type(result))
+    assert.equal(0, #result)
   end)
 
   it("buffer-scoped autocommand fires only for its buffer", function()

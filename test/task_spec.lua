@@ -11,10 +11,13 @@ describe("liv.std.task (L3)", function()
       hit = true
     end)
     -- pump the loop by running a short task to completion
-    task.block(task.run(function()
-      task.sleep(20)
-      return true
-    end), 1000)
+    task.block(
+      task.run(function()
+        task.sleep(20)
+        return true
+      end),
+      1000
+    )
     assert.is_true(hit)
   end)
 
@@ -29,10 +32,13 @@ describe("liv.std.task (L3)", function()
     task.schedule(function()
       order[#order + 1] = 3
     end)
-    task.block(task.run(function()
-      task.sleep(20)
-      return true
-    end), 1000)
+    task.block(
+      task.run(function()
+        task.sleep(20)
+        return true
+      end),
+      1000
+    )
     assert.same({ 1, 2, 3 }, order)
   end)
 

@@ -103,4 +103,60 @@ describe("liv.std.mapping (L3)", function()
     assert.equal("", core.call("maparg", "<F4>", "n"))
     assert.equal("", core.call("maparg", "<F4>", "i"))
   end)
+
+  it("get returns an info table for an existing mapping", function()
+    map.set("n", "<Plug>(livget)", "<Nop>")
+    local info = map.get("n", "<Plug>(livget)")
+    assert.equal("table", type(info))
+    assert.equal("<Plug>(livget)", info.lhs)
+    assert.equal("n", info.mode)
+    -- Flags read back as Lua booleans (not 0/1), matching liv's convention.
+    assert.equal("boolean", type(info.noremap))
+    assert.is_true(info.noremap)
+    map.del("n", "<Plug>(livget)")
+  end)
+
+  it("get returns nil for an unmapped lhs", function()
+    assert.is_nil(map.get("n", "<Plug>(livNeverMapped)"))
+  end)
+
+  it("get normalizes a modes list to its first element", function()
+    map.set({ "n", "i" }, "<Plug>(livgetlist)", "<Nop>")
+    local info = map.get({ "n", "i" }, "<Plug>(livgetlist)")
+    assert.equal("table", type(info))
+    assert.equal("n", info.mode)
+    map.del({ "n", "i" }, "<Plug>(livgetlist)")
+  end)
+
+  it("get honors opts.buffer (a buffer-local query excludes a global map)", function()
+    -- A global map is found by a global query, but NOT by a buffer-local query.
+    map.set("n", "<Plug>(livgetscope)", "<Nop>")
+    assert.is_not_nil(map.get("n", "<Plug>(livgetscope)"))
+    assert.is_nil(map.get("n", "<Plug>(livgetscope)", { buffer = true }))
+    map.del("n", "<Plug>(livgetscope)")
+  end)
+
+  it("get honors opts.buffer (a buffer-local map is found only with buffer=true)", function()
+    -- A buffer-local map is found by a buffer-local query, but a global query
+    -- (the default) rejects the buffer-local shadow.
+    map.set("n", "<Plug>(livgetbuf)", { buffer = true }, "<Nop>")
+    local info = map.get("n", "<Plug>(livgetbuf)", { buffer = true })
+    assert.equal("table", type(info))
+    assert.equal("<Plug>(livgetbuf)", info.lhs)
+    assert.is_true(info.buffer)
+    assert.is_nil(map.get("n", "<Plug>(livgetbuf)"))
+    map.del("n", "<Plug>(livgetbuf)", { buffer = true })
+  end)
+
+  it("list includes a mapping matching mode and prefix", function()
+    map.set("n", "<Plug>(livlist1)", "<Nop>")
+    local found = false
+    for _, info in ipairs(map.list({ mode = "n", prefix = "<Plug>(livlist" })) do
+      if info.lhs == "<Plug>(livlist1)" then
+        found = true
+      end
+    end
+    assert.is_true(found)
+    map.del("n", "<Plug>(livlist1)")
+  end)
 end)

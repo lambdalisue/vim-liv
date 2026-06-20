@@ -71,12 +71,15 @@ return function(core)
   ---@param win integer
   ---@param size { width: integer, height: integer }
   function M.resize(win, size)
-    popup_setoptions(win, core.dict({
-      minwidth = size.width,
-      maxwidth = size.width,
-      minheight = size.height,
-      maxheight = size.height,
-    }))
+    popup_setoptions(
+      win,
+      core.dict({
+        minwidth = size.width,
+        maxwidth = size.width,
+        minheight = size.height,
+        maxheight = size.height,
+      })
+    )
   end
 
   return M

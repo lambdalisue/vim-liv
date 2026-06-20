@@ -42,8 +42,14 @@ function M.generate(vim_entries, nvim_entries)
 
   return {
     ["lua/liv/std/function/_generated_annotations.lua"] = format(common, "liv.std.function.Common"),
-    ["lua/liv/std/function/vim/_generated_annotations.lua"] = format(vim_only, "liv.std.function.Vim"),
-    ["lua/liv/std/function/nvim/_generated_annotations.lua"] = format(nvim_only, "liv.std.function.Nvim"),
+    ["lua/liv/std/function/vim/_generated_annotations.lua"] = format(
+      vim_only,
+      "liv.std.function.Vim"
+    ),
+    ["lua/liv/std/function/nvim/_generated_annotations.lua"] = format(
+      nvim_only,
+      "liv.std.function.Nvim"
+    ),
   }
 end
 

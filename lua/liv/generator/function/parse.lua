@@ -11,8 +11,19 @@ local M = {}
 -- Vim return types, longest first so "Float or Number" wins over "Float"/"Number".
 local TYPE_ORDER = {
   "Float or Number",
-  "Number", "String", "Float", "List", "Dict", "Funcref",
-  "Blob", "Job", "Channel", "Boolean", "Bool", "none", "any",
+  "Number",
+  "String",
+  "Float",
+  "List",
+  "Dict",
+  "Funcref",
+  "Blob",
+  "Job",
+  "Channel",
+  "Boolean",
+  "Bool",
+  "none",
+  "any",
 }
 local LUATYPE = {
   ["Float or Number"] = "number",

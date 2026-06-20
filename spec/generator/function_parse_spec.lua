@@ -22,12 +22,18 @@ describe("liv.generator.function.parse", function()
       "abs({expr})" .. TAB .. TAB .. "*abs()*", -- tag block
       "    Return the absolute value of {expr}.",
     }, "\n"))
-    assert.same({ { name = "abs", params = { { name = "expr", optional = false } }, rettype = "number" } }, got)
+    assert.same(
+      { { name = "abs", params = { { name = "expr", optional = false } }, rettype = "number" } },
+      got
+    )
   end)
 
   it("parses a tagged function with no table entry as return type any (Neovim case)", function()
     local got = parse("foo({x})" .. TAB .. TAB .. "*foo()*")
-    assert.same({ { name = "foo", params = { { name = "x", optional = false } }, rettype = "any" } }, got)
+    assert.same(
+      { { name = "foo", params = { { name = "x", optional = false } }, rettype = "any" } },
+      got
+    )
   end)
 
   it("parses optional params from the tag signature", function()

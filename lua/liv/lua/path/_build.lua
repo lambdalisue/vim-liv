@@ -80,9 +80,7 @@ return function(cfg)
     local absolute = is_sep(p:sub(1, 1))
     local stack = {}
     for _, seg in ipairs(segments(p)) do
-      if seg == "." then
-        -- skip
-      elseif seg == ".." then
+      if seg == ".." then
         local top = stack[#stack]
         if top ~= nil and top ~= ".." then
           stack[#stack] = nil
@@ -90,7 +88,8 @@ return function(cfg)
           stack[#stack + 1] = ".."
         end
         -- on an absolute path, ".." at root is dropped
-      else
+      elseif seg ~= "." then
+        -- a "." segment is a no-op and is dropped
         stack[#stack + 1] = seg
       end
     end

@@ -6,16 +6,13 @@ local generate = require("liv.generator.function.generate")
 describe("liv.generator.function.generate", function()
   local files
   before_each(function()
-    files = generate(
-      { -- vim
-        { name = "getline", params = { { name = "lnum", optional = false } }, rettype = "string" },
-        { name = "vimonly", params = {}, rettype = "integer" },
-      },
-      { -- nvim
-        { name = "getline", params = { { name = "lnum", optional = false } }, rettype = "string" },
-        { name = "nvimonly", params = {}, rettype = "integer" },
-      }
-    )
+    files = generate({ -- vim
+      { name = "getline", params = { { name = "lnum", optional = false } }, rettype = "string" },
+      { name = "vimonly", params = {}, rettype = "integer" },
+    }, { -- nvim
+      { name = "getline", params = { { name = "lnum", optional = false } }, rettype = "string" },
+      { name = "nvimonly", params = {}, rettype = "integer" },
+    })
   end)
 
   it("puts common functions under function with the Common class", function()

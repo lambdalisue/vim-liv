@@ -7,7 +7,11 @@ end
 
 describe("liv.bundler.rewrite", function()
   it("rewrites a vendored require to the plugin prefix", function()
-    local out = rewrite.rewrite('local b = require("liv.std.buffer")', vendored("liv.std.buffer"), "mp.vendor")
+    local out = rewrite.rewrite(
+      'local b = require("liv.std.buffer")',
+      vendored("liv.std.buffer"),
+      "mp.vendor"
+    )
     assert.equal('local b = require("mp.vendor.liv.std.buffer")', out)
   end)
 
@@ -24,7 +28,11 @@ describe("liv.bundler.rewrite", function()
   end)
 
   it("handles both quote styles and the parenthesis-less form", function()
-    local out = rewrite.rewrite("require 'liv.core' .. require(\"liv.lua.path\")", vendored("liv.core", "liv.lua.path"), "mp.vendor")
+    local out = rewrite.rewrite(
+      "require 'liv.core' .. require(\"liv.lua.path\")",
+      vendored("liv.core", "liv.lua.path"),
+      "mp.vendor"
+    )
     assert.equal("require 'mp.vendor.liv.core' .. require(\"mp.vendor.liv.lua.path\")", out)
   end)
 

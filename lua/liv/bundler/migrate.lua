@@ -105,7 +105,11 @@ end
 function M.relevant(entries, from, to, bundled)
   local out = {}
   for _, e in ipairs(entries) do
-    if M.compare(e.version, from) > 0 and M.compare(e.version, to) <= 0 and affects(e.modules, bundled) then
+    if
+      M.compare(e.version, from) > 0
+      and M.compare(e.version, to) <= 0
+      and affects(e.modules, bundled)
+    then
       out[#out + 1] = e
     end
   end

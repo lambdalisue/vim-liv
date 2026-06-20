@@ -14,12 +14,7 @@ local SIGNATURE = "\137PNG\r\n\26\n"
 
 -- Encode a big-endian 32-bit unsigned integer as 4 bytes.
 local function u32(v)
-  return char(
-    floor(v / 16777216) % 256,
-    floor(v / 65536) % 256,
-    floor(v / 256) % 256,
-    v % 256
-  )
+  return char(floor(v / 16777216) % 256, floor(v / 65536) % 256, floor(v / 256) % 256, v % 256)
 end
 
 -- Assemble one PNG chunk: length, type, data, then CRC-32 of (type .. data).
@@ -60,10 +55,7 @@ local function encode(img)
   end
   local idat = zlib.deflate(concat(rows))
 
-  return SIGNATURE
-    .. chunk("IHDR", ihdr)
-    .. chunk("IDAT", idat)
-    .. chunk("IEND", "")
+  return SIGNATURE .. chunk("IHDR", ihdr) .. chunk("IDAT", idat) .. chunk("IEND", "")
 end
 
 return encode

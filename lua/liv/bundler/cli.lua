@@ -191,7 +191,15 @@ function M.remove(opts, env)
   end
   if #remaining == 0 then
     fs.clean(vendor_root_of(target, lock.meta.plugin))
-    local empty = { meta = { plugin = lock.meta.plugin, source = lock.meta.source, from = lock.meta.from, roots = {} }, modules = {} }
+    local empty = {
+      meta = {
+        plugin = lock.meta.plugin,
+        source = lock.meta.source,
+        from = lock.meta.from,
+        roots = {},
+      },
+      modules = {},
+    }
     fs.write(target .. "/liv.lock", lockfile.serialize(empty))
     return { modules = {}, external = {}, lock = empty }
   end
@@ -226,7 +234,8 @@ function M.update(opts, env)
     for n in pairs(lock.modules) do
       bundled[n] = true
     end
-    notices = migrate.relevant(migrate.parse(opts.migrations), opts.from_version, opts.to_version, bundled)
+    notices =
+      migrate.relevant(migrate.parse(opts.migrations), opts.from_version, opts.to_version, bundled)
   end
 
   local res = M.main({
@@ -316,7 +325,9 @@ function M._complete(command, arglead, paths, lock_text)
   local want_bundled = command == "remove" or command == "update"
   local out = {}
   for _, item in ipairs(list.list(relpaths, roots)) do
-    if item.bundled == want_bundled and (arglead == "" or item.name:sub(1, #arglead) == arglead) then
+    if
+      item.bundled == want_bundled and (arglead == "" or item.name:sub(1, #arglead) == arglead)
+    then
       out[#out + 1] = item.name
     end
   end

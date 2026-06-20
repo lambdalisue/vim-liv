@@ -18,12 +18,14 @@ local PATTERN = "(require%s*%(?%s*)(['\"])([^'\"]+)(['\"])"
 ---@param prefix string the plugin-owned prefix (e.g. "myplugin.vendor").
 ---@return string rewritten
 function M.rewrite(source, vendored, prefix)
-  return (source:gsub(PATTERN, function(call, openq, name, closeq)
-    if vendored[name] then
-      return call .. openq .. prefix .. "." .. name .. closeq
-    end
-    -- not vendored (plugin-owned or external): leave the match unchanged
-  end))
+  return (
+    source:gsub(PATTERN, function(call, openq, name, closeq)
+      if vendored[name] then
+        return call .. openq .. prefix .. "." .. name .. closeq
+      end
+      -- not vendored (plugin-owned or external): leave the match unchanged
+    end)
+  )
 end
 
 -- Build the vendored-name set from the closure's module list.

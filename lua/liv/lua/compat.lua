@@ -21,10 +21,9 @@ local M = {}
 M.unpack = table.unpack or unpack
 
 -- table.pack arrived in 5.2; emulate it (with the `n` field) where absent.
-M.pack = table.pack
-  or function(...)
-    return { n = select("#", ...), ... }
-  end
+M.pack = table.pack or function(...)
+  return { n = select("#", ...), ... }
+end
 
 -- package.loaders was renamed package.searchers in 5.2.
 M.searchers = package.searchers or package.loaders
@@ -104,10 +103,9 @@ end
 
 -- math.pow was removed in 5.3.
 ---@type fun(x: number, y: number): number x raised to the power y
-M.pow = math.pow
-  or function(x, y)
-    return x ^ y
-  end
+M.pow = math.pow or function(x, y)
+  return x ^ y
+end
 
 -- Integer division (the `//` operator is banned by the dialect rule).
 ---@param a number dividend
@@ -126,10 +124,9 @@ end
 
 -- math.atan2 was folded into a 2-arg math.atan in 5.3.
 ---@type fun(y: number, x: number): number the arc tangent of y/x in radians
-M.atan2 = math.atan2
-  or function(y, x)
-    return math.atan(y, x)
-  end
+M.atan2 = math.atan2 or function(y, x)
+  return math.atan(y, x)
+end
 
 -- math.frexp / math.ldexp were removed in 5.3; IEEE754 float (un)packing needs
 -- them (e.g. liv.lua.msgpack). frexp splits x into a mantissa m in [0.5, 1) and
@@ -154,9 +151,8 @@ M.frexp = math.frexp
   end
 
 ---@type fun(m: number, e: integer): number m * 2^e
-M.ldexp = math.ldexp
-  or function(m, e)
-    return m * 2 ^ e
-  end
+M.ldexp = math.ldexp or function(m, e)
+  return m * 2 ^ e
+end
 
 return M

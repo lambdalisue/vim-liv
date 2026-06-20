@@ -3,7 +3,8 @@ local cli = require("liv.bundler.cli")
 
 describe("liv.bundler.cli.parse", function()
   it("separates module roots from --key=value flags", function()
-    local o = cli.parse({ "liv.std.buffer", "liv.core", "--source=path", "--from=/x", "--plugin=mp" })
+    local o =
+      cli.parse({ "liv.std.buffer", "liv.core", "--source=path", "--from=/x", "--plugin=mp" })
     assert.same({ "liv.std.buffer", "liv.core" }, o.roots)
     assert.equal("path", o.source)
     assert.equal("/x", o.from)

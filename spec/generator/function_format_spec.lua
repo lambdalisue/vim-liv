@@ -26,7 +26,9 @@ describe("liv.generator.function.format", function()
     }, "liv.std.function.Common")
     -- lnum required (in both), end optional (only the 2-arg variant), return unioned;
     -- `end` is a Lua keyword so it is renamed to end_.
-    assert.is_true(out:find("---@field getline fun(lnum: any, end_?: any): any[]|string", 1, true) ~= nil)
+    assert.is_true(
+      out:find("---@field getline fun(lnum: any, end_?: any): any[]|string", 1, true) ~= nil
+    )
   end)
 
   it("marks a bracketed param optional", function()
@@ -37,7 +39,9 @@ describe("liv.generator.function.format", function()
         rettype = "integer",
       },
     }, "C")
-    assert.is_true(out:find("---@field has fun(feature: any, check?: any): integer", 1, true) ~= nil)
+    assert.is_true(
+      out:find("---@field has fun(feature: any, check?: any): integer", 1, true) ~= nil
+    )
   end)
 
   it("handles a no-argument function", function()

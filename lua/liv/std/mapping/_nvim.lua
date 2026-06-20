@@ -3,7 +3,7 @@
 -- wrapped to receive the liv context table; a string rhs is used as-is. For an
 -- expr mapping the callback's return string is used as the keys (replace_keycodes
 -- so `<...>` notation works).
-local text = require("liv.lua.text")
+local text = require("liv.lua.text.coerce")
 
 return function(core)
   local set_keymap = core.marshaled(vim.api.nvim_set_keymap)

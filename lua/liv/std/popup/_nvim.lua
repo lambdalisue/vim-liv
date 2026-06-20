@@ -2,7 +2,7 @@
 -- floating window. The scratch buffer is created with bufhidden=wipe so closing
 -- the window reclaims it automatically — no window->buffer registry to maintain.
 -- liv's 1-based {line, col} maps to Neovim's 0-based row/col.
-local text = require("liv.lua.text")
+local text = require("liv.lua.text.coerce")
 
 return function(core)
   local create_buf = core.marshaled(vim.api.nvim_create_buf)

@@ -1,43 +1,4 @@
--- liv.lua.text — pure text/argument coercion helpers (spec 0006).
---
--- Editor-independent: these carry no editor access, so the editor-dependent
--- backends (popup, mapping) share one implementation instead of each hand-rolling
--- a byte-identical copy. Kept here in liv.lua because the logic is deterministic
--- pure Lua, L1-testable, and identical on every host.
-
-local M = {}
-
--- Normalize display content into a list of lines: a list is returned as-is; a
--- string is split on "\n" (a trailing newline yields a trailing empty line, and
--- an empty string yields a single empty line, matching how the editors render a
--- single blank row).
----@param content string|string[]
----@return string[] lines
-function M.lines(content)
-  if type(content) == "table" then
-    return content
-  end
-  local out = {}
-  for line in (content .. "\n"):gmatch("(.-)\n") do
-    out[#out + 1] = line
-  end
-  return out
-end
-
--- Coerce a string-or-list argument into a plain list to iterate. A list is
--- returned as-is; a scalar (e.g. a single mode "n") is wrapped into a
--- one-element list. Used to accept `modes` as either "n" or { "n", "i" }.
----@generic T
----@param value T|T[]
----@return T[] list
-function M.aslist(value)
-  if type(value) == "table" then
-    return value
-  end
-  return { value }
-end
-
--- Display-width string operations.
+-- liv.lua.text.width — display-width string operations (spec 0006).
 --
 -- Lua has no terminal display-width primitive (`#str` is bytes, not columns; an
 -- East-Asian wide char occupies two columns), so these algorithms are kept pure
@@ -46,6 +7,12 @@ end
 -- `strdisplaywidth()` in; tests inject a fake. Slicing always lands on UTF-8
 -- code-point boundaries (never mid-byte): we walk code points via `chars` and
 -- measure each with the injected width function.
+--
+-- This is the display-width concern leaf of the text module; the coercion group
+-- (lines/aslist) lives in liv.lua.text.coerce and is independent of this leaf, so
+-- a width-only bundle ships none of it (and vice versa). The barrel re-exposes
+-- both flat.
+local M = {}
 
 -- Byte length of the UTF-8 code point whose leading byte is `b`. Determined by
 -- value range only (no bitwise operators, which are not in the 5.1 dialect):

@@ -3,7 +3,7 @@
 -- Neovim float: a fixed-position overlay that never auto-repositions. Borders are
 -- expressed as borderchars per style (the same glyphs Neovim draws). popup line/
 -- col are already 1-based, matching liv's {line, col}.
-local text = require("liv.lua.text")
+local text = require("liv.lua.text.coerce")
 
 return function(core)
   local fn = vim.fn

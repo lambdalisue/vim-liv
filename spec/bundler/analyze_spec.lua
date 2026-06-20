@@ -173,6 +173,18 @@ describe("analyze.closure tree-shaking (real sources)", function()
     assert.is_nil(set["liv.lua.msgpack"])
   end)
 
+  it("color.xterm256 pulls the rgb leaf but NOT hsl or the barrel", function()
+    local set = module_set({ "liv.lua.color.xterm256" })
+    assert.is_true(set["liv.lua.color.xterm256"])
+    -- positive control: the quantizer coerces its input via the rgb leaf's
+    -- parse, so rgb must be present (rules out a vacuous nil-root run).
+    assert.is_true(set["liv.lua.color.rgb"])
+    -- the HSL concern and the barrel (which would re-pull the whole family)
+    -- stay out of an xterm256-only bundle.
+    assert.is_nil(set["liv.lua.color.hsl"])
+    assert.is_nil(set["liv.lua.color"])
+  end)
+
   it("std.hash pulls the md5/sha1 leaves but NOT sha256 or the barrel", function()
     local set = module_set({ "liv.std.hash" })
     assert.is_true(set["liv.std.hash"])
@@ -184,5 +196,27 @@ describe("analyze.closure tree-shaking (real sources)", function()
     -- and the barrel (which would re-pull the whole family) must never enter.
     assert.is_nil(set["liv.lua.hash.sha256"])
     assert.is_nil(set["liv.lua.hash"])
+  end)
+
+  it("text.coerce pulls nothing else: not width, not the barrel", function()
+    local set = module_set({ "liv.lua.text.coerce" })
+    assert.is_true(set["liv.lua.text.coerce"])
+    -- coerce is the zero-dependency coercion concern; it must stand entirely
+    -- alone, never dragging in the heavier display-width group or the barrel.
+    assert.is_nil(set["liv.lua.text.width"])
+    assert.is_nil(set["liv.lua.text"])
+  end)
+
+  it("std.mapping pulls the coerce leaf but NOT the display-width group", function()
+    local set = module_set({ "liv.std.mapping" })
+    assert.is_true(set["liv.std.mapping"])
+    -- positive control: the mapping backends coerce `modes` via the coerce leaf,
+    -- so it must be present (rules out a vacuous nil-root run that would pass
+    -- every exclusion below) AND proves the backends rewired off the barrel.
+    assert.is_true(set["liv.lua.text.coerce"])
+    -- the display-width algorithms and the barrel (which would re-pull the whole
+    -- family) stay out of a mapping-only bundle.
+    assert.is_nil(set["liv.lua.text.width"])
+    assert.is_nil(set["liv.lua.text"])
   end)
 end)

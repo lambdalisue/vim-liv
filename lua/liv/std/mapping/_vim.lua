@@ -5,7 +5,7 @@
 -- evaluates `g:LivExprInvoke(...)` so the handler's return string — with its
 -- key-notation replaced by real termcodes — becomes the keys to type. The
 -- <buffer>/<silent>/<nowait> modifiers mirror the opts.
-local text = require("liv.lua.text")
+local text = require("liv.lua.text.coerce")
 
 return function(core)
   local dispatch = require("liv.std._dispatch")(core)

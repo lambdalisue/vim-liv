@@ -7,6 +7,9 @@
 -- Color representation is a keyed table { r=, g=, b= } with channels 0-255,
 -- matching the keyed-table house style and letting parse -> to_hex round-trip.
 local color = require("liv.lua.color")
+local color_rgb = require("liv.lua.color.rgb")
+local color_hsl = require("liv.lua.color.hsl")
+local color_xterm256 = require("liv.lua.color.xterm256")
 
 describe("liv.lua.color.parse", function()
   it("parses a full '#rrggbb' string into channels", function()
@@ -230,5 +233,33 @@ describe("liv.lua.color.lighten / darken", function()
   it("darken clamps at black", function()
     local _, _, l = color.to_hsl(color.darken(color.hsl(200, 0.5, 0.1), 0.5))
     assert.is_true(l >= 0.0)
+  end)
+end)
+
+-- Leaf-direct requires: the barrel keeps the flat API, but a consumer may bundle
+-- just one concern by requiring its leaf directly. Exercise each leaf's surface
+-- through its own module so the split (not only the barrel) is pinned.
+describe("liv.lua.color leaves (direct require)", function()
+  it("rgb leaf owns the representation verbs", function()
+    assert.same({ r = 255, g = 0, b = 0 }, color_rgb.parse("#ff0000"))
+    assert.same({ r = 255, g = 136, b = 0 }, color_rgb.rgb(255, 136, 0))
+    assert.equal("#ff8800", color_rgb.to_hex({ r = 255, g = 136, b = 0 }))
+    local r, g, b = color_rgb.to_rgb({ r = 1, g = 2, b = 3 })
+    assert.same({ 1, 2, 3 }, { r, g, b })
+  end)
+
+  it("hsl leaf owns the HSL conversions and lighten/darken", function()
+    assert.same({ r = 255, g = 0, b = 0 }, color_hsl.hsl(0, 1, 0.5))
+    local h, s, l = color_hsl.to_hsl({ r = 255, g = 0, b = 0 })
+    assert.same({ 0, 1, 0.5 }, { h, s, l })
+    local _, _, ll = color_hsl.to_hsl(color_hsl.lighten(color_hsl.hsl(200, 0.5, 0.4), 0.2))
+    assert.is_true(ll > 0.4)
+  end)
+
+  it("xterm256 leaf owns quantization and distance, coercing via the rgb leaf", function()
+    assert.equal(196, color_xterm256.to_xterm256({ r = 255, g = 0, b = 0 }))
+    -- a parseable input is coerced through the rgb leaf's parse
+    assert.equal(196, color_xterm256.to_xterm256("#ff0000"))
+    assert.equal(5, color_xterm256.distance({ r = 0, g = 0, b = 0 }, { r = 3, g = 4, b = 0 }))
   end)
 end)

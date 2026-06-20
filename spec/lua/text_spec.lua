@@ -1,37 +1,57 @@
 -- L1 unit test for liv.lua.text (spec 0006). Pure, editor-independent helpers
 -- shared by the editor-dependent backends: splitting display content into lines,
 -- and coercing a string-or-list argument into a plain list to iterate.
-local text = require("liv.lua.text")
+--
+-- The module is split into two concern leaves under text/ — coerce (lines/aslist)
+-- and width (chars/truncate/pad/align/wrap) — re-exposed flat by the barrel. The
+-- coercion group is exercised through the leaf it now lives in; the display-width
+-- group through its leaf; and the barrel is asserted to keep the flat back-compat
+-- API so require("liv.lua.text") behaves exactly as before.
+local coerce = require("liv.lua.text.coerce")
+local text = require("liv.lua.text.width")
 
-describe("text.lines", function()
-  it("returns a list unchanged", function()
-    assert.same({ "a", "b" }, text.lines({ "a", "b" }))
-  end)
-
-  it("splits a single string on newlines", function()
-    assert.same({ "one", "two", "three" }, text.lines("one\ntwo\nthree"))
-  end)
-
-  it("returns a single-element list for a string with no newline", function()
-    assert.same({ "solo" }, text.lines("solo"))
-  end)
-
-  it("preserves a trailing empty line", function()
-    assert.same({ "a", "" }, text.lines("a\n"))
-  end)
-
-  it("returns a single empty line for an empty string", function()
-    assert.same({ "" }, text.lines(""))
+describe("text barrel back-compat", function()
+  it("re-exposes the flat API of both concern leaves", function()
+    local barrel = require("liv.lua.text")
+    assert.equal(coerce.lines, barrel.lines)
+    assert.equal(coerce.aslist, barrel.aslist)
+    assert.equal(text.chars, barrel.chars)
+    assert.equal(text.truncate, barrel.truncate)
+    assert.equal(text.pad, barrel.pad)
+    assert.equal(text.align, barrel.align)
+    assert.equal(text.wrap, barrel.wrap)
   end)
 end)
 
-describe("text.aslist", function()
+describe("coerce.lines", function()
+  it("returns a list unchanged", function()
+    assert.same({ "a", "b" }, coerce.lines({ "a", "b" }))
+  end)
+
+  it("splits a single string on newlines", function()
+    assert.same({ "one", "two", "three" }, coerce.lines("one\ntwo\nthree"))
+  end)
+
+  it("returns a single-element list for a string with no newline", function()
+    assert.same({ "solo" }, coerce.lines("solo"))
+  end)
+
+  it("preserves a trailing empty line", function()
+    assert.same({ "a", "" }, coerce.lines("a\n"))
+  end)
+
+  it("returns a single empty line for an empty string", function()
+    assert.same({ "" }, coerce.lines(""))
+  end)
+end)
+
+describe("coerce.aslist", function()
   it("wraps a scalar string into a one-element list", function()
-    assert.same({ "n" }, text.aslist("n"))
+    assert.same({ "n" }, coerce.aslist("n"))
   end)
 
   it("returns a list unchanged", function()
-    assert.same({ "n", "i" }, text.aslist({ "n", "i" }))
+    assert.same({ "n", "i" }, coerce.aslist({ "n", "i" }))
   end)
 end)
 

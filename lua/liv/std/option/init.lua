@@ -5,22 +5,24 @@
 --                       option.g.expandtab = true     (set)
 --   - raw API:          option.g.get("expandtab") / option.g.set("expandtab", v)
 -- Boolean options are normalized to Lua booleans on BOTH editors (Vim natively
--- reports them as 0/1) using the generated option metadata; values otherwise
+-- reports them as 0/1) using the generated boolean-name set; values otherwise
 -- cross through core marshaling. Editor-specific options live under
 -- `option.vim.*` / `option.nvim.*` (typed to the vim-only / nvim-only sets;
 -- the runtime scope tables are shared).
 local core = require("liv.core")
 
-local meta_common = require("liv.std.option._generated")
-local meta_plat = core.is_nvim and require("liv.std.option.nvim._generated")
+-- The generated runtime metadata is a slim SET of boolean option names (the only
+-- thing the runtime needs: whether to coerce a 0/1 get into a Lua boolean). The
+-- full type/scope table lives in the require-free LuaLS annotations.
+local bool_common = require("liv.std.option._generated")
+local bool_plat = core.is_nvim and require("liv.std.option.nvim._generated")
   or require("liv.std.option.vim._generated")
 local backend = (core.is_nvim and require("liv.std.option._nvim") or require("liv.std.option._vim"))(
   core
 )
 
-local function type_of(name)
-  local m = meta_common[name] or meta_plat[name]
-  return m and m.type
+local function is_boolean(name)
+  return bool_common[name] or bool_plat[name] or false
 end
 
 -- The buffer (.b) and window (.w) scopes accept an OPTIONAL trailing target
@@ -33,14 +35,14 @@ local function make_scope(scope)
 
   function raw.get(name, target)
     local value = backend.get(scope, name, target)
-    if type_of(name) == "boolean" and type(value) == "number" then
+    if is_boolean(name) and type(value) == "number" then
       value = value ~= 0
     end
     return value
   end
 
   function raw.set(name, value, target)
-    backend.set(scope, name, value, type_of(name), target)
+    backend.set(scope, name, value, target)
   end
 
   -- Reset an option to its default value within this scope. The reset is

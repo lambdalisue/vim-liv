@@ -13,7 +13,7 @@ Format: one entry per version, newest first.
 
 ```
 Unreleased
-    Modules: liv.std.variable, liv.std.function, liv.std.mapping, liv.std.popup, liv.std.bufname, liv.std.process, liv.std.mark, liv.has, liv.lua.zlib.inflate, liv.lua.zlib.deflate, liv.lua.png.decode, liv.lua.png.encode, liv.lua.msgpack.pack, liv.lua.msgpack.unpack, liv.lua.color.rgb, liv.lua.color.hsl, liv.lua.color.xterm256, liv.lua.text.coerce, liv.lua.text.width
+    Modules: liv.std.variable, liv.std.function, liv.std.option, liv.std.mapping, liv.std.popup, liv.std.bufname, liv.std.process, liv.std.mark, liv.has, liv.lua.zlib.inflate, liv.lua.zlib.deflate, liv.lua.png.decode, liv.lua.png.encode, liv.lua.msgpack.pack, liv.lua.msgpack.unpack, liv.lua.color.rgb, liv.lua.color.hsl, liv.lua.color.xterm256, liv.lua.text.coerce, liv.lua.text.width
     BREAKING: std modules renamed to align with denops/std vocabulary. API
     signatures are unchanged — only the module path/name moved. Update requires:
       liv.std.var   -> liv.std.variable
@@ -96,4 +96,17 @@ Unreleased
     The mapping and popup backends, which coerce content/modes but never measure
     display width, now require liv.lua.text.coerce directly, so a mapping- or
     popup-only bundle no longer ships the heavier display-width algorithms.
+    CHANGE: liv.std.option's generated RUNTIME metadata (the _generated.lua
+    modules) was slimmed from a full {type,scope} record per option (~436 entries)
+    to a SET of boolean option names ({ [name] = true }, ~142 entries). The
+    runtime only needs to know whether an option is boolean (to coerce a 0/1 get
+    into a Lua boolean); set-side formatting now keys off the passed Lua value's
+    own type, and option scope was never read at runtime. The per-option Lua
+    TYPE is retained in the require-free LuaLS _generated_annotations.lua (which
+    drives completion/type-checks), so DX is unchanged; the scope field, never
+    consumed at runtime or for completion (init types every option under all
+    g/b/w/l scopes), is dropped. Consumer behavior is unchanged (the public
+    option API and value coercion are identical); a consumer that directly
+    required liv.std.option._generated for its records — never a public
+    contract — would need to read the annotations instead.
 ```

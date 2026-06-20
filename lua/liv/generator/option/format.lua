@@ -1,9 +1,15 @@
 -- liv.generator.option.format — emit generated artifacts from parsed option defs
 -- (pure Lua). Produces two strings:
---   meta        a loadable module returning name -> { type, scope }
+--   meta        a loadable module returning a SET of boolean option names
+--               ({ [name] = true, ... }), containing ONLY boolean options. This
+--               is the slim RUNTIME artifact: the only thing the runtime needs is
+--               "is this option boolean?" for the get-side 0/1->boolean coercion.
+--               Scope and non-boolean types are deliberately omitted to keep the
+--               vendored bundle small.
 --   annotations a LuaLS `---@meta` file declaring `class_name` with one
---               `---@field <name> <luatype>` per option (drives completion for
---               the property-access API option.g.<name>, etc.)
+--               `---@field <name> <luatype>` per option (ALL options, full types;
+--               drives completion for the property-access API option.g.<name>,
+--               etc.). Never required at runtime, so it stays complete.
 local M = {}
 
 -- Vim option type -> LuaLS type.
@@ -26,7 +32,7 @@ end
 
 -- The formatted option artifacts.
 ---@class liv.generator.option.Formatted
----@field meta string A loadable module returning name -> { type, scope }.
+---@field meta string A loadable module returning a SET of boolean option names.
 ---@field annotations string A LuaLS `---@meta` file declaring `class_name`'s fields.
 
 ---@param options liv.generator.option.Def[] Parsed option definitions.
@@ -35,10 +41,13 @@ end
 function M.format(options, class_name)
   local names, by_name = sorted(options)
 
+  -- Runtime meta: a slim SET of boolean option names. Only booleans need the
+  -- get-side 0/1->boolean coercion; scope and other types live in annotations.
   local meta = { BANNER, "return {" }
   for _, name in ipairs(names) do
-    local o = by_name[name]
-    meta[#meta + 1] = string.format("  [%q] = { type = %q, scope = %q },", name, o.type, o.scope)
+    if by_name[name].type == "boolean" then
+      meta[#meta + 1] = string.format("  [%q] = true,", name)
+    end
   end
   meta[#meta + 1] = "}"
 

@@ -2,11 +2,12 @@
 -- (vim.fn.*) — the same shape the _nvim backend uses for vim.api.*, so marshaling
 -- stays in core and is never hand-rolled. The option seam still uses core.eval/cmd
 -- for `&name` reads and `let &...` writes. Vim returns boolean options as 0/1 (the
--- init layer normalizes those to Lua booleans using the option type); on set,
--- booleans are written as 1/0. Buffer/window-local options use setbufvar/setwinvar
--- with '&name' and accept an optional target handle (buf number / window id),
--- defaulting to current; global/local use `let &g:name = expr` / `let &l:name =
--- expr` with a type-formatted value.
+-- init layer normalizes those to Lua booleans using the boolean-name set); on set,
+-- the value is formatted by its OWN Lua type (boolean -> 1/0, string -> quoted,
+-- number -> raw), so no declared option type is needed. Buffer/window-local
+-- options use setbufvar/setwinvar with '&name' and accept an optional target
+-- handle (buf number / window id), defaulting to current; global/local use
+-- `let &g:name = expr` / `let &l:name = expr` with the formatted value.
 return function(core)
   local fn = vim.fn
   local bufnr = core.marshaled(fn.bufnr)
@@ -46,8 +47,10 @@ return function(core)
     return core.eval("&" .. sigil .. name)
   end
 
-  function M.set(scope, name, value, type_, target)
-    if type_ == "boolean" then
+  function M.set(scope, name, value, target)
+    -- Format by the value's OWN Lua type: a boolean option is set with true/false
+    -- (-> 1/0), a string option with a string, a number option with a number.
+    if type(value) == "boolean" then
       value = value and 1 or 0
     end
     if scope == "b" then
@@ -59,8 +62,8 @@ return function(core)
     end
     local sigil = scope == "g" and "g:" or "l:"
     local expr
-    if type_ == "string" then
-      expr = "'" .. tostring(value):gsub("'", "''") .. "'"
+    if type(value) == "string" then
+      expr = "'" .. value:gsub("'", "''") .. "'"
     else
       expr = tostring(value)
     end

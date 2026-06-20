@@ -8,29 +8,32 @@ describe("liv.generator.option.generate", function()
   before_each(function()
     files = generate({ -- vim
       { name = "expandtab", type = "boolean", scope = "buffer" },
-      { name = "vimonly", type = "number", scope = "global" },
+      { name = "vimbool", type = "boolean", scope = "global" },
+      { name = "vimnumber", type = "number", scope = "global" },
     }, { -- nvim
       { name = "expandtab", type = "boolean", scope = "buffer" },
-      { name = "nvimonly", type = "string", scope = "global" },
+      { name = "nvimbool", type = "boolean", scope = "global" },
     })
   end)
 
-  it("puts options present in both editors in the common module", function()
+  it("puts boolean options present in both editors in the common runtime set", function()
     local common = assert(load(files["lua/liv/std/option/_generated.lua"]))()
-    assert.is_not_nil(common.expandtab)
-    assert.is_nil(common.vimonly)
-    assert.is_nil(common.nvimonly)
+    assert.equal(true, common.expandtab)
+    assert.is_nil(common.vimbool)
+    assert.is_nil(common.nvimbool)
   end)
 
-  it("puts vim-only options under option/vim", function()
+  it("puts vim-only boolean options under option/vim (non-boolean dropped)", function()
     local vim = assert(load(files["lua/liv/std/option/vim/_generated.lua"]))()
-    assert.is_not_nil(vim.vimonly)
+    assert.equal(true, vim.vimbool)
     assert.is_nil(vim.expandtab)
+    -- a vim-only NON-boolean option is absent from the slim runtime set
+    assert.is_nil(vim.vimnumber)
   end)
 
-  it("puts nvim-only options under option/nvim", function()
+  it("puts nvim-only boolean options under option/nvim", function()
     local nvim = assert(load(files["lua/liv/std/option/nvim/_generated.lua"]))()
-    assert.is_not_nil(nvim.nvimonly)
+    assert.equal(true, nvim.nvimbool)
     assert.is_nil(nvim.expandtab)
   end)
 

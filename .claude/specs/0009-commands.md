@@ -44,6 +44,17 @@ the already-bundled roots.
 | --- | --- |
 | `bin/liv-generator` | Regenerate the typed editor-API wrappers (`liv.std.function` builtins, `liv.std.option` options) and their LuaLS annotations from the **pinned** Vim/Neovim docs (`liv.generator.supported_versions`). Dev-time only; emits committed source, never runs at a consumer's runtime. |
 
+The generator splits its output into two artifacts with different lifetimes:
+a **runtime artifact** (`*_generated.lua`) carrying the **minimal** data the
+runtime actually consumes, and an **annotation artifact**
+(`*_generated_annotations.lua`) carrying the **full** type information for LuaLS
+(`---@meta`; never `require`d, so it adds no bundle weight). For `liv.std.option`
+this means the runtime `_generated.lua` is a slim SET of boolean option names
+(the runtime only needs "is this option boolean?" for the 0/1->boolean get
+coercion; scope is unused and set-side formatting keys off the Lua value's type),
+while the complete `{type,scope}` per-option table lives only in the annotations.
+Keep this separation: the vendored runtime stays small without losing type DX.
+
 ## `--source` (default `rtp`)
 
 Source is recorded **per module** in the lockfile; `--source` sets the default for

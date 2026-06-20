@@ -41,7 +41,7 @@ return function(core)
     return get_opt(name, target_dict(scope, target))
   end
 
-  function M.set(scope, name, value, _type, target)
+  function M.set(scope, name, value, target)
     set_opt(name, value, target_dict(scope, target))
   end
 

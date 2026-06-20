@@ -65,11 +65,14 @@ local function run_l3_editor(bin, files, root, project)
   if bin == "nvim" then
     invoke = string.format('nvim --headless --clean -c "luafile %s" -c "qa!"', entry)
   else
-    invoke = string.format("vim -es --clean -c \"lua dofile('%s')\" -c \"qa!\"", entry)
+    invoke = string.format('vim -es --clean -c "lua dofile(\'%s\')" -c "qa!"', entry)
   end
   local env = string.format(
     "LIV_ROOT='%s' LIV_PROJECT='%s' LIV_L3_LIST='%s' LIV_L3_OUT='%s' ",
-    root, project, list, out
+    root,
+    project,
+    list,
+    out
   )
   os.execute(env .. invoke .. " >/dev/null 2>&1")
 
@@ -116,7 +119,17 @@ function M.main(opts)
 
   local l3 = discover(project .. "/test")
   if #l3 > 0 then
-    for _, bin in ipairs({ "nvim", "vim" }) do
+    -- LIV_L3_EDITORS (comma-separated) overrides the default both-editor run, so a
+    -- caller can target a single editor (e.g. `just test:vim` / `just test:nvim`).
+    local editors = { "nvim", "vim" }
+    local only = os.getenv("LIV_L3_EDITORS")
+    if only and only ~= "" then
+      editors = {}
+      for name in only:gmatch("[^,%s]+") do
+        editors[#editors + 1] = name
+      end
+    end
+    for _, bin in ipairs(editors) do
       if succeeded(os.execute("command -v " .. bin .. " >/dev/null 2>&1")) then
         ran_any = true
         local p, f, body = run_l3_editor(bin, l3, root, project)

@@ -1,0 +1,6 @@
+# StyLua config — locks the repo's house style (2-space indent, double quotes).
+# Generated typed-binding files are excluded via .styluaignore.
+column_width = 100
+indent_type = "Spaces"
+indent_width = 2
+quote_style = "AutoPreferDouble"

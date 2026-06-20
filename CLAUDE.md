@@ -16,10 +16,16 @@ source of truth. Start with `.claude/specs/0001-overview.md`.
 ## Architecture (six namespaces, one monorepo)
 
 Runtime (vendored into consumer plugins):
-- `liv.core` — invariant seam over the editor + value marshaling. The **only**
-  module allowed to touch `vim.*`. (Rare escape hatch for authors.)
-- `liv.std` — **editor-dependent** cross-editor API (buffer/window/process/…).
-  Touches the editor **only via `liv.core`**. Named by purpose.
+- `liv.core` — the seam. Its load-bearing invariant is NOT "the only module that
+  names `vim.*`" (36 std backends name `vim.fn`/`vim.api` directly). It is the two
+  chokepoints: **(1) editor-value marshaling is centralized here** (`to_editor`/
+  `from_editor`/`marshaled` — never hand-rolled elsewhere) and **(2) the vimscript
+  seam is centralized here** (`call`/`eval`/`cmd` — the only raw `vim.call/eval/command`).
+- `liv.std` — **editor-dependent** cross-editor API (buffer/window/process/…), named
+  by purpose. Backends MAY name/call native refs directly, but cross editor **values**
+  through `liv.core` (`core.marshaled(vim.fn.X)` / `core.marshaled(vim.api.X)`) and use
+  core's seam — never hand-roll marshaling. Plain-Lua natives that carry no editor
+  values (`vim.uv`, `vim.json`) need no marshaling and are called directly.
 - `liv.lua` — **editor-independent** pure-Lua modules (`liv.lua.compat`,
   `liv.lua.async`, `liv.lua.path`, …). Never touches the editor.
 

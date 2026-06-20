@@ -39,7 +39,7 @@ See [0003-architecture](0003-architecture.md).
   zero-extra-install goal). Pure Lua only.
 - **Capabilities Vim lacks** (treesitter, lsp, true libuv) are impossible to make
   cross-editor by *any* approach. liv keeps them out of the contract and exposes
-  `liv.has()` + graceful degradation (see [0002](0002-principles.md),
+  `liv.std.has()` + graceful degradation (see [0002](0002-principles.md),
   [0006](0006-std.md)).
 
 ## Non-goals

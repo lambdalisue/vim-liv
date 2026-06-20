@@ -30,5 +30,5 @@ NOT polyfill or mirror Neovim's API.
 ## Capability and degradation
 
 - Power features unavailable on Vim (treesitter, lsp, true libuv) are NOT in the
-  contract. Expose `liv.has(feature)` so authors branch intentionally; degrade
+  contract. Expose `liv.std.has(feature)` so authors branch intentionally; degrade
   gracefully — never fail silently.

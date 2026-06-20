@@ -34,7 +34,7 @@ Neovim, and you want your users to install just your plugin. liv gives you:
 - A build step (|:LivAdd|) that copies liv into YOUR plugin under a private
   namespace, so there is no separate "install liv first" step for users.
 - Honesty about editor differences: everything in the contract works on both
-  editors; power features are gated by |liv.has()| so you opt in on purpose.
+  editors; power features are gated by |liv.std.has()| so you opt in on purpose.
 
 liv owns its own stable contract: everything in it is guaranteed to work on
 both editors. It deliberately does NOT copy Neovim's API names or shapes —
@@ -124,8 +124,8 @@ liv.lua		Editor-independent pure Lua (deterministic, no editor; safe
 liv.core	The single seam over the editor: value marshaling and the
 		vimscript bridge. The only module that marshals; advanced use.
 
-						*liv.has*
-liv.has		Capability detection — see |liv-capabilities|.
+						*liv.std.has*
+liv.std.has		Capability detection — see |liv-capabilities|.
 
 ==============================================================================
 6. Conventions					*liv-conventions*
@@ -144,8 +144,8 @@ Neovim's):
 ==============================================================================
 7. Capabilities					*liv-capabilities*
 
-						*liv.has()*
-liv.has({feature})	Returns whether {feature} is available so you branch on
+						*liv.std.has()*
+liv.std.has({feature})	Returns whether {feature} is available so you branch on
 			purpose instead of failing silently. Base contract
 			features are true on both editors; power features
 			differ. Known features include: >
@@ -153,7 +153,7 @@ liv.has({feature})	Returns whether {feature} is available so you branch on
 	"fs.async" "fetch" "image" "image.gui"
 <			An unknown feature returns false (never an error), so
 			new keys stay forward-compatible. Example: >
-	if require("myplugin.vendor.liv.has")("mark.virt_text") then
+	if require("myplugin.vendor.liv.std.has")("mark.virt_text") then
 	  ... -- show virtual text
 	end
 <

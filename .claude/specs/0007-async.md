@@ -4,10 +4,10 @@ Provide "synchronous-looking asynchronous code" as one model across both editors
 The design splits cleanly along the namespace boundary ([0003](0003-architecture.md)):
 
 - **`liv.lua.async` — the pure coroutine engine** (editor-independent, most of the
-  code, L1-testable): `await`, `wrap`, `run`, and structured-concurrency helpers
-  (`gather` / `race` / `any` / `with_timeout`). `schedule` and other leaves are
-  **injected**, so it runs on any host and is unit-tested with fakes. Library
-  authors depend on this directly to stay editor-independent.
+  code, L1-testable): `await`, `wrap`, `run`, and structured-concurrency
+  combinators (`gather` / `select` / `channel` / `semaphore`). `schedule` and
+  other leaves are **injected**, so it runs on any host and is unit-tested with
+  fakes. Library authors depend on this directly to stay editor-independent.
 - **Editor-bound `liv.std` modules** wire the real editor leaves into the engine
   and are **named by purpose** (e.g. `liv.std.process` for external processes).
   They supply a `schedule` (`vim.schedule` / `timer_start`) and leaves
@@ -15,7 +15,7 @@ The design splits cleanly along the namespace boundary ([0003](0003-architecture
   anything. They are **not** a same-named `liv.std.async` re-export.
 
 ```
-helpers: gather / race / any / with_timeout     (liv.lua.async — pure)
+combinators: gather / select / channel / semaphore  (liv.lua.async — pure)
 runner + await + wrap                            (liv.lua.async — pure)
         |  schedule + leaves injected by an editor-bound liv.std module
         v
@@ -135,9 +135,50 @@ lacks coroutines). Adding a Promise would split "awaitable" into two kinds
 - The handle returned by `run` is a **first-class Task** (awaitable, `:cancel()`),
   which covers the one thing a Promise uniquely offered — a handle to an in-flight
   value.
-- Structured concurrency is provided as helpers over Tasks: `gather` (all),
-  `race`, `any`, `with_timeout` (cancels the inner task).
+- Structured concurrency is provided as combinators over Tasks: `gather`
+  (await-all), `select` (first-to-finish), plus the coordination primitives
+  `channel` and `semaphore` (see below). liv uses its own vocabulary — there is
+  no `Promise`/`then`/`all`/`race`.
 - No external-Promise interop is needed (there is no JS in this environment).
+
+## Structured-concurrency combinators (pure Lua)
+
+These live in `liv.lua.async` (pure, editor-independent). `gather`/`select`
+spawn one child `run` per task onto the **parent's `schedule`**, inherited via
+the engine's per-coroutine schedule registry (`runner.current_schedule()`), so a
+combinator called from inside an async function needs no injected `schedule` and
+children interleave through the one main loop. `channel`/`semaphore` need no
+schedule: they park a `resume` in a FIFO waiter list and wake it later (the
+parked `resume` already carries its own run's schedule from its `await`). The
+engine stays minimal — the registry is one weak-keyed map plus one accessor.
+
+- `gather(tasks)` → `results` — run an array of zero-arg async functions
+  concurrently and return their results **in input order**, after **all**
+  complete. **Fail-fast**: on the first task error, the rest are **cancelled**
+  and that error propagates through `await`. An empty list resolves to `{}`.
+- `select(tasks)` → `index, result` — run them concurrently and return the
+  **1-based index** and result of the **first to settle**; the others are
+  cancelled. "Settle" includes failure: if the first finisher errored, that
+  error propagates through `await` (consistent with `await`). Requires ≥1 task.
+- **Parent-cancellation propagates.** Both `gather` and `select` return a canceler
+  from their `await` (stored as the await's `cancel_current`), so cancelling the
+  PARENT run tears down **every** child run — not just the ones a fail-fast / first-
+  settle path already cancels. A parent cancelled mid-flight never orphans children
+  that would otherwise keep resuming on the shared schedule.
+- `channel()` → `{ send, recv, close }` — an async **MPSC** channel. `send(value)`
+  enqueues and **never blocks**; `recv()` awaits the next value, **parking** the
+  caller (FIFO) until one is available; `close()` marks it closed. A `recv` that
+  has drained the buffer returns the **`async.closed`** sentinel instead of
+  parking (and parked recvs are woken with it on close). Values are stored packed,
+  so **`nil` is a first-class queued value**, distinct from the closed sentinel —
+  `recv` never returns a bare `nil` to signal closure. `send` after `close`
+  errors.
+- `semaphore(n)` → `{ acquire, release }` — a counting semaphore with `n`
+  permits. `acquire()` awaits until a permit is free then takes one; `release()`
+  returns a permit. **FIFO fairness**: `release` hands the freed permit directly
+  to the longest-waiting acquirer rather than incrementing and racing. Combined
+  with `gather` it **bounds concurrency** (e.g. `permits = 2` over 4 gathered
+  tasks keeps at most 2 running at once).
 
 ## Leaf backends (wired by editor-bound `liv.std`)
 
@@ -158,4 +199,4 @@ into the pure engine above.
 internally blocking, binary-safe). True async fs on Vim requires offloading to an
 external process, which is not worth it (portability cost defeats "works with just
 `+lua`"). True async is **opt-in** (`fs.read(path,{async=true})`, reusing the
-process leaf), gated by `liv.has("fs.async")`. Neovim is true-async for free.
+process leaf), gated by `liv.std.has("fs.async")`. Neovim is true-async for free.

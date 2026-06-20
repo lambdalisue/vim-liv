@@ -23,7 +23,7 @@ vim-liv/
   bin/liv-tester            # terminal entry -> liv.tester.cli  (bin/liv-bundler: planned)
   bin/liv-generator         # terminal entry -> liv.generator   (typed-wrapper codegen)
   lua/liv/
-    core/                   # liv.core.*    (seam; only module touching vim.*)
+    core/                   # liv.core.*    (seam; centralizes value marshaling + call/eval/cmd)
     std/                    # liv.std.*     (editor-dependent API; via core only)
     lua/                    # liv.lua.*     (editor-independent pure Lua)
       compat.lua            #   liv.lua.compat  (Axis A shim)
@@ -33,6 +33,10 @@ vim-liv/
       http/                 #   liv.lua.http    (pure HTTP message parser)
       zlib/                 #   liv.lua.zlib    (pure DEFLATE inflate/deflate)
       png/                  #   liv.lua.png     (pure PNG codec; on liv.lua.zlib)
+      hash/                 #   liv.lua.hash    (pure md5/sha1/sha256 + hmac)
+      base64.lua            #   liv.lua.base64  (pure RFC 4648 base64 + url-safe)
+      argument.lua          #   liv.lua.argument (command-arg parser: ++opt/--flag/rest)
+      color.lua             #   liv.lua.color   (pure RGB/HSL/hex/xterm-256 color math)
     tester/                 # liv.tester.*  (test framework + cli; never vendored)
     bundler/                # liv.bundler.* (tool; never vendored)
     generator/              # liv.generator.* (typed-wrapper codegen; never vendored)
@@ -48,7 +52,7 @@ The everyday author surface is effectively **two** namespaces — `liv.std` and
 single question:
 
 - **Does it need the editor to function?** → `liv.std` (a purpose-named,
-  editor-dependent module; may degrade / be gated by `liv.has`, see
+  editor-dependent module; may degrade / be gated by `liv.std.has`, see
   [0006](0006-std.md)).
 - **Is it pure computation?** → `liv.lua` (deterministic on every host, unit
   testable, safe to depend on from a library with no backend matrix).

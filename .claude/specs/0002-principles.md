@@ -19,7 +19,7 @@ Owning the contract instead means:
   core promise: "install only the plugin, works on both").
 - liv versions its own evolution (not bound to upstream).
 - Power features (treesitter, lsp, …) are out of contract; authors branch
-  intentionally via `liv.has()` with graceful degradation — never silent failure.
+  intentionally via `liv.std.has()` with graceful degradation — never silent failure.
 
 ## P2. Distinct naming (no "similar but different")
 

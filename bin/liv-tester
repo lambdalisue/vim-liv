@@ -15,5 +15,12 @@ package.path = table.concat({
   package.path,
 }, ";")
 
-local failed = require("liv.tester.cli").main({ root = root, project = project })
-os.exit(failed == 0 and 0 or 1)
+local argv = {}
+for i = 1, #arg do
+  argv[i] = arg[i]
+end
+
+-- main() returns a structured exit code (0 ok / 1 test failures / 2 usage error /
+-- 4 no tests found); pass it straight through.
+local code = require("liv.tester.cli").main({ root = root, project = project, argv = argv })
+os.exit(code)

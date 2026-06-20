@@ -20,8 +20,34 @@ command! -nargs=* -complete=customlist,<SID>complete_update LivUpdate call s:liv
 command! -nargs=0                                           LivCheck  call s:liv('check',  <q-args>)
 command! -nargs=+ -complete=customlist,<SID>complete_remove LivRemove call s:liv('remove', <q-args>)
 
+"   :LivTest [init] [PATH...] [--select=...] [--reporter=...] [--seed=N]
+"            [--failed] [--list] [--editor=nvim|vim|both] ...
+"                             run the plugin's specs (spec/ as L1, test/ as L3 on
+"                             both editors); see :help liv-tester / spec 0010.
+command! -nargs=*                                          LivTest   call s:livtest(<q-args>)
+
 function! s:liv(cmd, args) abort
   call luaeval('require("liv.bundler.cli")._command(_A[1], _A[2], _A[3])', [a:cmd, a:args, &runtimepath])
+endfunction
+
+" :LivTest — thin shim over liv.tester.cli (the SAME entry as bin/liv-tester).
+" Resolves vim-liv's root from &runtimepath (so the tester module loads), treats
+" the current working directory as the plugin under test, and forwards the
+" argument string as argv tokens. cli.main RETURNS a structured exit code rather
+" than calling os.exit (which would kill the editor); the shim only echoes it.
+function! s:livtest(args) abort
+  let l:dir = globpath(&runtimepath, 'lua/liv/tester/cli.lua', 0, 1)
+  if empty(l:dir)
+    echohl ErrorMsg | echom 'liv-tester: liv.tester not found on runtimepath' | echohl NONE
+    return
+  endif
+  " .../<root>/lua/liv/tester/cli.lua → <root> (strip cli.lua/tester/liv/lua)
+  let l:root = fnamemodify(l:dir[0], ':h:h:h:h')
+  let l:code = luaeval('require("liv.tester.cli").main({ root = _A[1], project = _A[2], argv = _A[3] })',
+        \ [l:root, getcwd(), split(a:args)])
+  if l:code != 0
+    echohl WarningMsg | echom 'liv-tester exited with ' . l:code | echohl NONE
+  endif
 endfunction
 
 " Completion: enumerate bundle-able liv modules on &runtimepath and the lockfile,

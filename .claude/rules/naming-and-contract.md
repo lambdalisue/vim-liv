@@ -32,3 +32,9 @@ NOT polyfill or mirror Neovim's API.
 - Power features unavailable on Vim (treesitter, lsp, true libuv) are NOT in the
   contract. Expose `liv.std.has(feature)` so authors branch intentionally; degrade
   gracefully — never fail silently.
+
+## Test-only internals
+
+- Keep the public surface intentional: expose a module's locals to tests only via
+  a clearly-marked `M._internal` / `M.__test` field, never by widening the real
+  API. See [`specs/0010-testing.md`](../specs/0010-testing.md#testing-non-exported-internals).

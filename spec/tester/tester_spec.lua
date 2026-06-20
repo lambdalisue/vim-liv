@@ -19,6 +19,14 @@ describe("liv.tester assertions", function()
     end)
   end)
 
+  it("same names the first differing path in its error", function()
+    local err = A.has_error(function()
+      A.same({ a = 1, b = 2 }, { a = 1, b = 3 })
+    end)
+    -- The message points at the key that differs, not just the whole tables.
+    assert.is_not_nil(tostring(err):find("b", 1, true))
+  end)
+
   it("has_error matches a substring of the message", function()
     A.has_error(function()
       error("boom: detail")

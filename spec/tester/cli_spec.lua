@@ -1,0 +1,107 @@
+-- L1 self-test for liv.tester.cli argument parsing (spec 0010).
+local cli = require("liv.tester.cli")
+
+describe("liv.tester.cli.parse_args", function()
+  it("collects positional path arguments", function()
+    local parsed = cli.parse_args({ "spec/a_spec.lua", "spec/b_spec.lua" })
+    assert.same({ "spec/a_spec.lua", "spec/b_spec.lua" }, parsed.paths)
+  end)
+
+  it("collects a single --select into a one-element list", function()
+    local parsed = cli.parse_args({ "--select=name:login" })
+    assert.same({ "name:login" }, parsed.select)
+  end)
+
+  it("collects repeated --select into a list (OR)", function()
+    local parsed = cli.parse_args({ "--select=tag:smoke", "--select=name:login" })
+    assert.same({ "tag:smoke", "name:login" }, parsed.select)
+  end)
+
+  it("records --reporter", function()
+    local parsed = cli.parse_args({ "--reporter=tap" })
+    assert.equal("tap", parsed.reporter)
+  end)
+
+  it("flags --help and --version", function()
+    assert.is_true(cli.parse_args({ "--help" }).help)
+    assert.is_true(cli.parse_args({ "--version" }).version)
+  end)
+
+  it("defaults to empty selection and no paths", function()
+    local parsed = cli.parse_args({})
+    assert.same({}, parsed.paths)
+    assert.same({}, parsed.select)
+  end)
+
+  it("defaults jobs to 1 (sequential)", function()
+    assert.equal(1, cli.parse_args({}).jobs)
+  end)
+
+  it("parses --jobs=N as a number", function()
+    assert.equal(4, cli.parse_args({ "--jobs=4" }).jobs)
+  end)
+
+  it("clamps a non-positive or non-numeric --jobs to 1", function()
+    assert.equal(1, cli.parse_args({ "--jobs=0" }).jobs)
+    assert.equal(1, cli.parse_args({ "--jobs=oops" }).jobs)
+  end)
+
+  it("flags --fail-fast", function()
+    assert.is_true(cli.parse_args({ "--fail-fast" }).fail_fast)
+    assert.is_false(cli.parse_args({}).fail_fast)
+  end)
+
+  it("parses --max-failures=N as a number (nil when absent)", function()
+    assert.equal(3, cli.parse_args({ "--max-failures=3" }).max_failures)
+    assert.is_nil(cli.parse_args({}).max_failures)
+  end)
+
+  it("defaults --editor to both and parses an explicit choice", function()
+    assert.same({ "nvim", "vim" }, cli.parse_args({}).editors)
+    assert.same({ "nvim" }, cli.parse_args({ "--editor=nvim" }).editors)
+    assert.same({ "vim" }, cli.parse_args({ "--editor=vim" }).editors)
+    assert.same({ "nvim", "vim" }, cli.parse_args({ "--editor=both" }).editors)
+  end)
+
+  it("parses --seed=N as a number (nil when absent)", function()
+    assert.equal(123, cli.parse_args({ "--seed=123" }).seed)
+    assert.is_nil(cli.parse_args({}).seed)
+  end)
+
+  it("flags --failed and --list", function()
+    assert.is_true(cli.parse_args({ "--failed" }).failed)
+    assert.is_false(cli.parse_args({}).failed)
+    assert.is_true(cli.parse_args({ "--list" }).list)
+    assert.is_false(cli.parse_args({}).list)
+  end)
+
+  it("records which keys the user explicitly set (present)", function()
+    local parsed = cli.parse_args({ "--jobs=2", "--reporter=tap" })
+    assert.is_true(parsed.present.jobs)
+    assert.is_true(parsed.present.reporter)
+    assert.is_nil(parsed.present.select)
+    assert.is_nil(parsed.present.editor)
+  end)
+
+  it("records select presence only when --select is given", function()
+    assert.is_true(cli.parse_args({ "--select=tag:x" }).present.select)
+    assert.is_nil(cli.parse_args({}).present.select)
+  end)
+end)
+
+describe("liv.tester.cli.cli_overrides (presence-only, for config merge)", function()
+  it("includes only the keys the user explicitly set", function()
+    local parsed = cli.parse_args({ "--jobs=2" })
+    local over = cli.cli_overrides(parsed)
+    assert.equal(2, over.jobs)
+    -- An unset key is absent (nil), so it cannot clobber a config value.
+    assert.is_nil(over.reporter)
+    assert.is_nil(over.select)
+  end)
+
+  it("carries an explicit --select list as an override", function()
+    local parsed = cli.parse_args({ "--select=tag:x", "--select=name:y" })
+    local over = cli.cli_overrides(parsed)
+    assert.same({ "tag:x", "name:y" }, over.select)
+  end)
+end)

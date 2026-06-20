@@ -1,0 +1,241 @@
+-- L1 self-test for the liv.tester registry: tags, focus (only), skip, pending,
+-- three-state counts, and selector filtering. Each case builds a HERMETIC
+-- registry via tester.new() so it never perturbs the surrounding live run.
+local tester = require("liv.tester")
+
+describe("liv.tester registry", function()
+  it("run() returns passed, failed, skipped, failures", function()
+    local t = tester.new()
+    t.describe("g", function()
+      t.it("ok", function() end)
+      t.it("bad", function()
+        error("boom")
+      end)
+    end)
+    local passed, failed, skipped, failures = t.run()
+    assert.equal(1, passed)
+    assert.equal(1, failed)
+    assert.equal(0, skipped)
+    assert.equal(1, #failures)
+    assert.equal("failed", failures[1].status)
+  end)
+
+  it("it.skip registers but does not run, counted as skipped", function()
+    local t = tester.new()
+    local ran = false
+    t.describe("g", function()
+      t.it.skip("skipped", function()
+        ran = true
+      end)
+      t.it("ran", function() end)
+    end)
+    local passed, failed, skipped = t.run()
+    assert.is_false(ran)
+    assert.equal(1, passed)
+    assert.equal(0, failed)
+    assert.equal(1, skipped)
+  end)
+
+  it("describe.skip skips the whole subtree", function()
+    local t = tester.new()
+    t.describe.skip("group", function()
+      t.it("a", function() end)
+      t.it("b", function() end)
+    end)
+    local passed, _failed, skipped = t.run()
+    assert.equal(0, passed)
+    assert.equal(2, skipped)
+  end)
+
+  it("pending(reason) inside a body marks the test skipped, not failed", function()
+    local t = tester.new()
+    t.describe("g", function()
+      t.it("wip", function()
+        t.pending("not done")
+        error("should not reach here")
+      end)
+    end)
+    local passed, failed, skipped = t.run()
+    assert.equal(0, passed)
+    assert.equal(0, failed)
+    assert.equal(1, skipped)
+  end)
+
+  it("it.only runs only the focused test", function()
+    local t = tester.new()
+    local ran = {}
+    t.describe("g", function()
+      t.it("a", function()
+        ran.a = true
+      end)
+      t.it.only("b", function()
+        ran.b = true
+      end)
+      t.it("c", function()
+        ran.c = true
+      end)
+    end)
+    local passed = t.run()
+    assert.equal(1, passed)
+    assert.is_nil(ran.a)
+    assert.is_true(ran.b)
+    assert.is_nil(ran.c)
+  end)
+
+  it("describe.only focuses a whole subtree", function()
+    local t = tester.new()
+    local ran = {}
+    t.describe.only("focused", function()
+      t.it("a", function()
+        ran.a = true
+      end)
+    end)
+    t.describe("other", function()
+      t.it("b", function()
+        ran.b = true
+      end)
+    end)
+    local passed = t.run()
+    assert.equal(1, passed)
+    assert.is_true(ran.a)
+    assert.is_nil(ran.b)
+  end)
+
+  it("a selector filter excludes non-matching tests (not counted)", function()
+    local t = tester.new()
+    t.describe("g", function()
+      t.it("alpha", function() end)
+      t.it("beta", function() end)
+    end)
+    local select = require("liv.tester._select")
+    local passed, failed, skipped = t.run(nil, { filter = select.compile({ "name:alpha" }) })
+    assert.equal(1, passed)
+    assert.equal(0, failed)
+    assert.equal(0, skipped)
+  end)
+
+  it("tags on describe and it compose for the filter", function()
+    local t = tester.new()
+    t.describe("group", { tags = { "db" } }, function()
+      t.it("query", { tags = { "slow" } }, function() end)
+      t.it("ping", function() end)
+    end)
+    local select = require("liv.tester._select")
+    local both = t.run(nil, { filter = select.compile({ "tag:db,tag:slow" }) })
+    assert.equal(1, both)
+    local just_db = t.run(nil, { filter = select.compile({ "tag:db" }) })
+    assert.equal(2, just_db)
+  end)
+
+  it("keeps describe(name, fn) and it(name, fn) back-compatible", function()
+    local t = tester.new()
+    local ran = false
+    t.describe("g", function()
+      t.it("plain", function()
+        ran = true
+      end)
+    end)
+    local passed = t.run()
+    assert.is_true(ran)
+    assert.equal(1, passed)
+  end)
+
+  it("runs in declaration order by default (no seed)", function()
+    local t = tester.new()
+    local order = {}
+    t.describe("g", function()
+      for i = 1, 6 do
+        t.it("t" .. i, function()
+          order[#order + 1] = i
+        end)
+      end
+    end)
+    t.run()
+    assert.same({ 1, 2, 3, 4, 5, 6 }, order)
+  end)
+
+  it("opts.seed shuffles sibling order deterministically", function()
+    local function order_for(seed)
+      local t = tester.new()
+      local order = {}
+      t.describe("g", function()
+        for i = 1, 6 do
+          t.it("t" .. i, function()
+            order[#order + 1] = i
+          end)
+        end
+      end)
+      t.run(nil, { seed = seed })
+      return order
+    end
+    local a = order_for(42)
+    local b = order_for(42)
+    assert.same(a, b)
+    -- Shuffled, not declaration order (for this seed/size).
+    assert.is_false(a[1] == 1 and a[2] == 2 and a[3] == 3 and a[4] == 4 and a[5] == 5 and a[6] == 6)
+    -- Still a permutation: all six ran exactly once.
+    assert.equal(6, #a)
+  end)
+
+  it("a seed still runs every candidate (count unchanged)", function()
+    local t = tester.new()
+    t.describe("g", function()
+      t.it("a", function() end)
+      t.it("b", function() end)
+      t.it("c", function() end)
+    end)
+    local passed = t.run(nil, { seed = 7 })
+    assert.equal(3, passed)
+  end)
+
+  it("list() enumerates candidate full titles without running bodies", function()
+    local t = tester.new()
+    local ran = false
+    t.describe("g", function()
+      t.it("alpha", function()
+        ran = true
+      end)
+      t.it("beta", function()
+        ran = true
+      end)
+    end)
+    local names = t.list()
+    assert.is_false(ran)
+    assert.same({ "g alpha", "g beta" }, names)
+  end)
+
+  it("list() honors the selector filter", function()
+    local t = tester.new()
+    t.describe("g", function()
+      t.it("alpha", function() end)
+      t.it("beta", function() end)
+    end)
+    local select = require("liv.tester._select")
+    local names = t.list({ filter = select.compile({ "name:alpha" }) })
+    assert.same({ "g alpha" }, names)
+  end)
+
+  it("list() honors focus (only)", function()
+    local t = tester.new()
+    t.describe("g", function()
+      t.it("a", function() end)
+      t.it.only("b", function() end)
+    end)
+    assert.same({ "g b" }, t.list())
+  end)
+
+  it("a failure record carries the test's file:line origin", function()
+    local t = tester.new()
+    t.describe("g", function()
+      t.it("bad", function()
+        error("boom")
+      end)
+    end)
+    local _p, _f, _s, failures = t.run()
+    assert.equal(1, #failures)
+    -- The origin captured at it() (debug.getinfo) rides along on the failure
+    -- record, so a `--failed` rerun and the state file can point at the source.
+    assert.equal("string", type(failures[1].file))
+    assert.equal("number", type(failures[1].line))
+  end)
+end)

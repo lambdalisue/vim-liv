@@ -8,6 +8,9 @@ lua_modules/
 # Test / coverage
 .coverage/
 
+# liv-tester last-run state (written for `--failed` rerun)
+.liv/
+
 # Editor / OS
 *.swp
 *.swo

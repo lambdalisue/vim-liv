@@ -102,6 +102,18 @@ files — and the direction deps flow across it — is what determines bundle si
   one public leaf per independently-usable concern, plus a barrel that requires
   the leaves for the all-in-one / dispatch API. Don't pack independent concerns
   into one fat file — a consumer wanting one concern then bundles them all.
+- **Question aggregator/factory structures, but MEASURE before splitting.** A
+  factory that returns a table of all a family's functions (e.g. a `_build(cfg)`)
+  couples every function into one closure, just like a barrel — so before deciding,
+  measure the shared-core LOC vs the per-function LOC. Split only when the
+  per-function code is substantial AND the shared core is genuinely non-dominant
+  AND a real consumer uses a subset. Counter-examples that correctly KEEP the
+  aggregator: `liv.lua.compat` (its bit-op engine is the dominant shared core);
+  `liv.lua.path` (`_build` parameterizes over the path *flavour* — posix/unc — which
+  is the dominant axis, and the functions are tiny and mutually share parsing, so
+  splitting the function axis would explode into per-flavour×per-concern files for
+  a benefit only to rare single-flavour-single-function external consumers). Over-
+  splitting is itself a cost (file count, `require` overhead, lost cohesion).
 
 ## Bundler distribution
 

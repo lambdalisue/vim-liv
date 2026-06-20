@@ -1,45 +1,11 @@
--- liv.lua.uri — RFC 3986-shaped URI codec (spec 0006). Pure Lua, editor-
--- independent, deterministic, L1-testable. Lua ships no URI parsing or
--- percent-coding, so this owns liv's own vocabulary for it: parse/build (the
--- generic split and its inverse), encode/decode (byte-wise percent coding), and
--- encode_query/decode_query (the `k=v&...` form). The names are liv's own — this
--- is deliberately NOT the JS `URL`/`URLSearchParams` shape.
---
--- Components are kept RAW: `parse` does NOT percent-decode them, and `build` does
--- NOT percent-encode them. Decoding is a separate, deliberate step the caller
--- composes (e.g. `decode_query(parse(s).query)`), so a URI that is already a
--- valid wire form round-trips through `parse`/`build` unchanged.
-
+-- liv.lua.uri.url — the generic RFC 3986 split and its inverse: parse/build.
+-- Pure, zero-dependency. Components are kept RAW — `parse` does NOT percent-
+-- decode them and `build` does NOT percent-encode them — so a URI that is
+-- already a valid wire form round-trips through parse/build unchanged, and the
+-- percent codec stays a separate, deliberate step the caller composes (e.g.
+-- query.decode_query(parse(s).query)). That is why this leaf requires neither
+-- liv.lua.uri.percent nor liv.lua.uri.query.
 local M = {}
-
--- RFC 3986 unreserved set: ALPHA / DIGIT / "-" / "." / "_" / "~". Everything else
--- is percent-encoded. The class is spelled out (not `%w`) so the membership is
--- explicit and locale-independent.
-local UNRESERVED = "[^A-Za-z0-9%-._~]"
-
--- Percent-encode a string. Operates on BYTES, so a multibyte UTF-8 character is
--- encoded as its constituent bytes (e.g. "あ" → "%E3%81%82"). Hex digits are
--- uppercase, per RFC 3986 §2.1's recommendation. Space therefore becomes "%20"
--- (it is not unreserved), never "+".
----@param str string
----@return string
-function M.encode(str)
-  return (str:gsub(UNRESERVED, function(c)
-    return ("%%%02X"):format(c:byte())
-  end))
-end
-
--- Reverse percent-decoding: each "%XX" (XX = two hex digits) becomes the byte it
--- names. An incomplete or invalid escape ("%", "%2", "%zz") is left LITERAL
--- rather than raising — the pattern only matches a well-formed `%` + two hex
--- digits, so malformed input passes through untouched.
----@param str string
----@return string
-function M.decode(str)
-  return (str:gsub("%%(%x%x)", function(hex)
-    return string.char(tonumber(hex, 16))
-  end))
-end
 
 -- Split the authority component ("[userinfo@]host[:port]") into its parts. Only
 -- ever called for a real authority (i.e. when the URI had a "//"), so it does not
@@ -174,72 +140,6 @@ function M.build(parts)
   end
 
   return table.concat(out)
-end
-
--- Encode a `{ key = value }` table into a "k=v&k2=v2" query string. A value may be
--- a scalar or an array of scalars; an array expands into repeated keys in order
--- ({ k = { "1", "2" } } → "k=1&k=2"). Keys and values are percent-encoded (so a
--- space becomes "%20", keeping the output RFC-clean). Keys are emitted in sorted
--- order, making the output deterministic and therefore testable.
----@param tbl table<string, string|string[]>
----@return string
-function M.encode_query(tbl)
-  local keys = {}
-  for k in pairs(tbl) do
-    keys[#keys + 1] = k
-  end
-  table.sort(keys)
-
-  local pairs_out = {}
-  for _, k in ipairs(keys) do
-    local ek = M.encode(k)
-    local v = tbl[k]
-    if type(v) == "table" then
-      for _, item in ipairs(v) do
-        pairs_out[#pairs_out + 1] = ek .. "=" .. M.encode(item)
-      end
-    else
-      pairs_out[#pairs_out + 1] = ek .. "=" .. M.encode(v)
-    end
-  end
-
-  return table.concat(pairs_out, "&")
-end
-
--- Parse a "k=v&k2=v2" query string back into a table — the inverse of
--- encode_query. Keys and values are percent-decoded. A key without "=" ("a&b=2")
--- and an explicit empty value ("a=") both read as an empty-string value. A key
--- that appears more than once collects its values into an array, preserving
--- order; a key that appears once stays a scalar. An empty query yields an empty
--- table.
----@param str string
----@return table<string, string|string[]>
-function M.decode_query(str)
-  local out = {}
-  if str == "" then
-    return out
-  end
-
-  for piece in (str .. "&"):gmatch("(.-)&") do
-    if piece ~= "" then
-      local rawk, rawv = piece:match("^([^=]*)=(.*)$")
-      if not rawk then
-        rawk, rawv = piece, "" -- bare key, no "="
-      end
-      local key = M.decode(rawk)
-      local value = M.decode(rawv)
-      local existing = out[key]
-      if existing == nil then
-        out[key] = value
-      elseif type(existing) == "table" then
-        existing[#existing + 1] = value
-      else
-        out[key] = { existing, value }
-      end
-    end
-  end
-
-  return out
 end
 
 return M

@@ -38,4 +38,15 @@ Unreleased
     line) via Neovim extmark end_col / Vim text-property end_col. Gated by the
     new capability has("mark.range") (Neovim always; Vim via text properties).
     The existing whole-line place() contract is unchanged. Purely additive.
+    ADD: liv.lua.uri was split from a single flat file (uri.lua) into concern
+    leaves (uri/init.lua is now the barrel) so a consumer can bundle just one
+    concern. The barrel (liv.lua.uri) keeps its full flat API unchanged —
+    require("liv.lua.uri") behaves exactly as before, so this is purely additive
+    (no consumer require path was renamed). New public leaf paths a consumer may
+    require directly instead of the barrel:
+      liv.lua.uri.percent — encode / decode (byte-wise percent coding, zero deps)
+      liv.lua.uri.url     — parse / build (generic RFC 3986 split + inverse)
+      liv.lua.uri.query   — encode_query / decode_query (requires the percent leaf)
+    A percent-only bundle (require liv.lua.uri.percent) no longer ships parse/build
+    or the query codec; a query-only bundle pulls percent but not parse/build.
 ```

@@ -26,7 +26,7 @@
 -- (no lookahead). So `--foo bar` is `flags.foo = true` plus positional `bar`. Only
 -- the FIRST `=` splits, so `--expr=a=b=c` keeps the value `a=b=c`.
 --
--- Repeats collect (mirroring liv.lua.uri.decode_query): the first occurrence of a
+-- Repeats collect (mirroring liv.lua.uri.query.decode_query): the first occurrence of a
 -- key is a scalar, the second promotes it to an array preserving order, so
 -- `--inc=a --inc=b` → `{ "a", "b" }` and `--foo --foo=bar` → `{ true, "bar" }`.
 -- This applies to both `opts` and `flags`.
@@ -97,7 +97,7 @@ end
 
 -- Insert `value` under `key` in `dest`, collecting repeats into an array (first
 -- occurrence scalar, second promotes to a list preserving order). Shared by opts
--- and flags; mirrors liv.lua.uri.decode_query's repeat handling.
+-- and flags; mirrors liv.lua.uri.query.decode_query's repeat handling.
 ---@param dest table<string, any>
 ---@param key string
 ---@param value string|boolean
@@ -198,7 +198,7 @@ local function emit(out, prefix, key, value)
   end
 end
 
--- Sorted keys of a table, for deterministic output (mirrors uri.encode_query).
+-- Sorted keys of a table, for deterministic output (mirrors uri.query.encode_query).
 ---@param tbl table
 ---@return string[]
 local function sorted_keys(tbl)

@@ -85,3 +85,52 @@ describe("analyze.closure", function()
     assert.same({ "ext.lib" }, result.external)
   end)
 end)
+
+-- Tree-shaking regression: the bundler closure is file-grained, so a leaf that
+-- requires only its sibling leaf (never the barrel) must NOT drag the rest of
+-- the family in. These read the REAL source from disk (cwd = repo root) so they
+-- assert the actual require graph, not a hand-written stand-in.
+describe("analyze.closure tree-shaking (real sources)", function()
+  -- Resolve a liv module name to its on-disk source: lua/<path>.lua, else
+  -- lua/<path>/init.lua. Returns nil for anything not under lua/ (recorded as
+  -- external, not traversed) — the assertions only care about exclusion.
+  local function file_resolve(name)
+    local rel = "lua/" .. name:gsub("%.", "/")
+    for _, p in ipairs({ rel .. ".lua", rel .. "/init.lua" }) do
+      local f = io.open(p, "rb")
+      if f then
+        local s = f:read("*a")
+        f:close()
+        return s
+      end
+    end
+    return nil
+  end
+
+  local function module_set(roots)
+    local set = {}
+    for _, m in ipairs(analyze.closure(roots, file_resolve).modules) do
+      set[m] = true
+    end
+    return set
+  end
+
+  it("uri.percent pulls nothing else: not url, not query, not the barrel", function()
+    local set = module_set({ "liv.lua.uri.percent" })
+    assert.is_true(set["liv.lua.uri.percent"])
+    -- percent is the zero-dependency concern; it must stand entirely alone.
+    assert.is_nil(set["liv.lua.uri.url"])
+    assert.is_nil(set["liv.lua.uri.query"])
+    assert.is_nil(set["liv.lua.uri"])
+  end)
+
+  it("uri.query pulls the percent leaf but NOT url or the barrel", function()
+    local set = module_set({ "liv.lua.uri.query" })
+    assert.is_true(set["liv.lua.uri.query"])
+    -- positive control: the query codec percent-encodes keys/values via percent.
+    assert.is_true(set["liv.lua.uri.percent"])
+    -- parse/build and the barrel stay out of a query-only bundle
+    assert.is_nil(set["liv.lua.uri.url"])
+    assert.is_nil(set["liv.lua.uri"])
+  end)
+end)

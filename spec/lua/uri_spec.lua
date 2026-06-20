@@ -230,6 +230,21 @@ describe("liv.lua.uri.decode_query", function()
   end)
 end)
 
+-- The percent codec is the most-used, zero-dependency concern. A consumer that
+-- needs only percent coding requires the leaf directly instead of the barrel,
+-- which would also pull the parse/build and query machinery.
+describe("liv.lua.uri.percent leaf", function()
+  local percent = require("liv.lua.uri.percent")
+
+  it("encodes through the leaf identically to the barrel", function()
+    assert.equal("a%20b%2F%3F%26%3D", percent.encode("a b/?&="))
+  end)
+
+  it("decodes through the leaf identically to the barrel", function()
+    assert.equal("a b/?&=", percent.decode("a%20b%2F%3F%26%3D"))
+  end)
+end)
+
 describe("liv.lua.uri query round-trip", function()
   it("round-trips a flat table through encode_query then decode_query", function()
     local t = { name = "Ada", lang = "Lua 5.1", note = "a&b=c" }

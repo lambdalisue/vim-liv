@@ -44,6 +44,32 @@ editor primitive → `liv.core`. The two dev tools each expose a canonical
 - `:LivCheck` — doctor + drift (vendored tree vs lockfile) + outdated report.
 - `:LivRemove module...` — remove modules and now-unused dependencies.
 
+## Claude Code skills (plugin marketplace)
+
+This repository doubles as a [Claude Code](https://claude.com/claude-code)
+**plugin marketplace**: a `liv` plugin bundling four skills that teach Claude how
+to author, test, and bundle liv plugins.
+
+| skill | use it when |
+| --- | --- |
+| `liv-plugin-authoring` | writing/reviewing liv code: namespace placement, own-the-contract naming, 1-based ranges, the Lua 5.1 dialect, string-literal `require`, barrel/leaf splits |
+| `liv-library-api` | calling or looking up a liv API: `liv.core`, the `liv.std.*` editor-dependent modules, the `liv.lua.*` pure modules, capability/degradation via `has` |
+| `liv-bundler` | vendoring liv into a plugin: `:LivAdd`/`:LivUpdate`/`:LivCheck`/`:LivRemove`, `bin/liv-bundler`, source resolvers, lockfile, migration notices |
+| `liv-tester` | writing/running cross-editor tests: L1 (`spec/`) vs L3 (`test/`), `describe`/`it`/`assert`, selectors, reporters, `bin/liv-tester` flags |
+
+Each skill auto-triggers from its description; deeper detail lives in
+[`.claude/specs/`](.claude/specs/).
+
+Install from within Claude Code:
+
+```
+/plugin marketplace add lambdalisue/vim-liv
+/plugin install liv@vim-liv
+```
+
+The marketplace manifest is [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json);
+the plugin and its skills live under [`plugins/liv/`](plugins/liv/).
+
 ## Design
 
 See [`.claude/specs/`](.claude/specs/) for the normative specifications.

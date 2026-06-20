@@ -1,0 +1,18 @@
+{
+  "name": "vim-liv",
+  "owner": {
+    "name": "lambdalisue",
+    "url": "https://github.com/lambdalisue/vim-liv"
+  },
+  "metadata": {
+    "description": "Claude Code skills for authoring, testing, and bundling liv plugins — Lua plugins that run on both Vim 9 (+lua) and Neovim.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "liv",
+      "source": "./plugins/liv",
+      "description": "Author, test, and bundle liv plugins: namespace placement, the cross-editor API, liv.bundler vendoring, and the liv.tester L1/L3 runner."
+    }
+  ]
+}

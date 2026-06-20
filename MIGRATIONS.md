@@ -23,6 +23,17 @@ Unreleased
     The liv.has capability keys for popup windows were renamed to match:
       has("float")        -> has("popup")
       has("float.border") -> has("popup.border")
+    BREAKING: liv.std.popup is now buffer-backed (denops/std parity). open()
+    takes a caller-owned bufnr instead of content lines; create the buffer with
+    liv.std.buffer and write to it (the popup follows the buffer live). The popup
+    stays non-focusable/non-interactive (a display overlay) and closing it leaves
+    the buffer alive (caller-managed lifecycle). Added config(win,opts) for
+    in-place retitle/resize/reposition (move/resize are thin wrappers over it).
+    Migrate:
+      open(lines, opts)  ->  local b = buffer.create({ scratch = true })
+                             buffer.set_lines(b, 1, 1, lines)
+                             open(b, opts)
+    has("popup")/has("popup.border") unchanged.
     ADD: new pure module liv.std.bufname — buffer-name codec mirroring
     denops/std bufname. format({scheme,expr,params?,fragment?}) -> string and
     parse(string) -> bufname over the wire form scheme://expr[;k=v&...][#fragment].

@@ -1,20 +1,34 @@
 -- liv.std.popup — floating/popup windows (spec 0006). Editor-dependent; selects a
--- backend once at import. A float is a *display overlay*: the common ground
+-- backend once at import. A popup is a *display overlay*: the common ground
 -- between Neovim floating windows and Vim popups — non-focusable and not
 -- interactive (an editable/focusable float is a Neovim-only power feature, out of
--- this base contract). `open(content, opts)` shows `content` (a string, split on
--- newlines, or a list of lines) and returns a window handle; `close`/`move`/
--- `resize` act on that handle. Positions are liv's own 1-based `{line, col}`.
+-- this base contract). It is *buffer-backed* (denops/std parity): the caller OWNS
+-- a buffer (create it via liv.std.buffer) and `open(bufnr, opts)` displays it, so
+-- writing to the buffer updates the popup live. Editing/focus always stay on the
+-- underlying window, never the popup. Closing the popup leaves the buffer alive
+-- (the caller manages its lifecycle). `config` reconfigures an open popup in
+-- place; `move`/`resize` are thin wrappers over it. Positions are liv's own
+-- 1-based `{line, col}`.
+--- The configurable surface mirrors denops/std's popup.
 ---@class liv.std.popup.opts
----@field line? integer 1-based editor row of the top-left corner (default 1)
----@field col? integer 1-based editor column of the top-left corner (default 1)
----@field width? integer width in cells (default: widest line)
----@field height? integer height in rows (default: number of lines)
+---@field relative? "editor"|"cursor" position frame for line/col (default "editor")
+---@field anchor? "NW"|"NE"|"SW"|"SE" which popup corner sits at {line, col} (default "NW")
+---@field line? integer 1-based row of the anchor corner (editor row, or cursor offset when relative="cursor"; default 1)
+---@field col? integer 1-based column of the anchor corner (editor col, or cursor offset when relative="cursor"; default 1)
+---@field width? integer width in cells (default: widest buffer line)
+---@field height? integer height in rows (default: buffer line count)
+---@field zindex? integer stacking priority (higher = on top)
 ---@field border? boolean|"single"|"double"|"rounded" draw a border (true = "single")
 ---@field title? string a title shown on the top border (requires a border)
+---@field highlight? { normal?: string, border?: string } popup colours (modelled on
+--- denops/std): `normal` is the background/text highlight, `border` the border
+--- highlight. `normal` defaults to "Normal" so the popup is not Vim's pink Pmenu
+--- default; `border` is left to the editor default (Vim: the popup's own highlight;
+--- Neovim: FloatBorder) unless given.
 ---@class liv.std.popup
----@field open fun(content: string|string[], opts?: liv.std.popup.opts): integer
+---@field open fun(bufnr: integer, opts?: liv.std.popup.opts): integer
 ---@field close fun(win: integer)
+---@field config fun(win: integer, opts: liv.std.popup.opts)
 ---@field move fun(win: integer, pos: { line: integer, col: integer })
 ---@field resize fun(win: integer, size: { width: integer, height: integer })
 local core = require("liv.core")

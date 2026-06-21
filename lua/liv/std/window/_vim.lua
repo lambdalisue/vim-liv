@@ -3,6 +3,19 @@
 -- stays in core and is never hand-rolled. Vim cursor functions are 1-based for
 -- both line and column, matching liv's {line, col} convention directly. A handle
 -- of 0/nil resolves to the current window id once.
+
+-- Build the Ex command that opens a split relative to the current window.
+-- `above`/`left` open before it, `below`/`right` after; `left`/`right` are
+-- vertical (so `size` is a width), `above`/`below` horizontal (a height). Default
+-- direction is `below`. Identical on both editors (plain :split modifiers).
+local function split_cmd(opts)
+  local dir = opts.split or "below"
+  local pos = (dir == "above" or dir == "left") and "aboveleft" or "belowright"
+  local vertical = (dir == "left" or dir == "right") and "vertical " or ""
+  local size = opts.size and tostring(opts.size) or ""
+  return pos .. " " .. vertical .. size .. "split"
+end
+
 return function(core)
   local fn = vim.fn
   local win_getid = core.marshaled(fn.win_getid)
@@ -105,6 +118,33 @@ return function(core)
   ---@param pos integer[] {line, col}, both 1-based
   function M.set_cursor(win, pos)
     win_execute(valid_winid(win), "call cursor(" .. pos[1] .. ", " .. pos[2] .. ")")
+  end
+
+  ---Open the caller-owned buffer `bufnr` in a NEW split window and return its
+  ---handle. The split is relative to the current window: `above`/`below` are
+  ---horizontal (a height in cells via `size`), `left`/`right` are vertical (a
+  ---width). The new window is focused unless `focus = false`, which leaves the
+  ---current window focused. The buffer is the caller's — closing the window never
+  ---wipes it. (Float overlay? Use liv.std.popup instead.)
+  ---@param bufnr integer buffer to display (caller-owned)
+  ---@param opts? { split?: "above"|"below"|"left"|"right", size?: integer, focus?: boolean }
+  ---@return integer win
+  function M.open(bufnr, opts)
+    opts = opts or {}
+    local origin = win_getid()
+    core.cmd(split_cmd(opts) .. " | buffer " .. bufnr)
+    local win = win_getid()
+    if opts.focus == false then
+      win_gotoid(origin)
+    end
+    return win
+  end
+
+  ---Display the caller-owned buffer `bufnr` in window `win` (swap its buffer).
+  ---@param win integer? window handle; 0/nil = current
+  ---@param bufnr integer buffer to display (caller-owned)
+  function M.set_buffer(win, bufnr)
+    win_execute(valid_winid(win), "buffer " .. bufnr)
   end
 
   return M

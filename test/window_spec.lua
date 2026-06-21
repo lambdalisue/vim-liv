@@ -87,4 +87,46 @@ describe("liv.std.window (L3)", function()
       "expected liv-branded invalid-window error, got: " .. tostring(err)
     )
   end)
+
+  it("open displays a caller-owned buffer in a new split window", function()
+    local buf = buffer.create({ scratch = true })
+    buffer.set_lines(buf, 1, 1, { "sidebar" })
+    local before = #window.all()
+    local win = window.open(buf, { split = "right", size = 20 })
+    assert.is_true(window.valid(win))
+    assert.equal(before + 1, #window.all())
+    assert.equal(buf, window.buffer(win)) -- it shows the caller's buffer
+    assert.equal(win, window.current()) -- focus moves to the new window by default
+    window.close(win)
+  end)
+
+  it("open with focus=false leaves the current window unchanged", function()
+    local origin = window.current()
+    local buf = buffer.create({ scratch = true })
+    local win = window.open(buf, { split = "below", focus = false })
+    assert.is_true(window.valid(win))
+    assert.equal(origin, window.current()) -- focus stayed put
+    window.close(win)
+  end)
+
+  it("set_buffer swaps the buffer shown in a window", function()
+    local first = buffer.create({ scratch = true })
+    buffer.set_lines(first, 1, 1, { "first" })
+    local win = window.open(first, { split = "below" })
+    local second = buffer.create({ scratch = true })
+    buffer.set_lines(second, 1, 1, { "second" })
+    window.set_buffer(win, second)
+    assert.equal(second, window.buffer(win))
+    window.close(win)
+  end)
+
+  it("set_buffer raises a uniform liv error on an invalid window on both editors", function()
+    local buf = buffer.create({ scratch = true })
+    local ok, err = pcall(window.set_buffer, 999999, buf)
+    assert.is_false(ok)
+    assert.is_true(
+      tostring(err):find("liv.std.window: invalid window id", 1, true) ~= nil,
+      "expected liv-branded invalid-window error, got: " .. tostring(err)
+    )
+  end)
 end)

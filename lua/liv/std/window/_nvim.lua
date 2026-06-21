@@ -1,6 +1,19 @@
 -- liv.std.window Neovim backend: native API via core.marshaled. Neovim cursor
 -- is {row (1-based), col (0-based)}; liv positions are {line, col} both 1-based,
 -- so the column is shifted by one across the boundary.
+
+-- Build the Ex command that opens a split relative to the current window.
+-- `above`/`left` open before it, `below`/`right` after; `left`/`right` are
+-- vertical (so `size` is a width), `above`/`below` horizontal (a height). Default
+-- direction is `below`. Identical on both editors (plain :split modifiers).
+local function split_cmd(opts)
+  local dir = opts.split or "below"
+  local pos = (dir == "above" or dir == "left") and "aboveleft" or "belowright"
+  local vertical = (dir == "left" or dir == "right") and "vertical " or ""
+  local size = opts.size and tostring(opts.size) or ""
+  return pos .. " " .. vertical .. size .. "split"
+end
+
 return function(core)
   local current = core.marshaled(vim.api.nvim_get_current_win)
   local win_buf = core.marshaled(vim.api.nvim_win_get_buf)
@@ -12,6 +25,7 @@ return function(core)
   local win_close = core.marshaled(vim.api.nvim_win_close)
   local win_width = core.marshaled(vim.api.nvim_win_get_width)
   local win_height = core.marshaled(vim.api.nvim_win_get_height)
+  local set_buf = core.marshaled(vim.api.nvim_win_set_buf)
 
   local M = {}
 
@@ -94,6 +108,33 @@ return function(core)
   ---@param pos integer[] {line, col}, both 1-based
   function M.set_cursor(win, pos)
     set_cursor(valid_win(win), { pos[1], pos[2] - 1 })
+  end
+
+  ---Open the caller-owned buffer `bufnr` in a NEW split window and return its
+  ---handle. The split is relative to the current window: `above`/`below` are
+  ---horizontal (a height in cells via `size`), `left`/`right` are vertical (a
+  ---width). The new window is focused unless `focus = false`, which leaves the
+  ---current window focused. The buffer is the caller's — closing the window never
+  ---wipes it. (Float overlay? Use liv.std.popup instead.)
+  ---@param bufnr integer buffer to display (caller-owned)
+  ---@param opts? { split?: "above"|"below"|"left"|"right", size?: integer, focus?: boolean }
+  ---@return integer win
+  function M.open(bufnr, opts)
+    opts = opts or {}
+    local origin = current()
+    core.cmd(split_cmd(opts) .. " | buffer " .. bufnr)
+    local win = current()
+    if opts.focus == false then
+      set_current(origin)
+    end
+    return win
+  end
+
+  ---Display the caller-owned buffer `bufnr` in window `win` (swap its buffer).
+  ---@param win integer? window handle; 0/nil = current
+  ---@param bufnr integer buffer to display (caller-owned)
+  function M.set_buffer(win, bufnr)
+    set_buf(valid_win(win), bufnr)
   end
 
   return M

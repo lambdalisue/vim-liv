@@ -13,7 +13,7 @@ Format: one entry per version, newest first.
 
 ```
 Unreleased
-    Modules: liv.std.variable, liv.std.function, liv.std.option, liv.std.mapping, liv.std.popup, liv.std.bufname, liv.std.process, liv.std.mark, liv.has, liv.lua.zlib.inflate, liv.lua.zlib.deflate, liv.lua.png.decode, liv.lua.png.encode, liv.lua.msgpack.pack, liv.lua.msgpack.unpack, liv.lua.color.rgb, liv.lua.color.hsl, liv.lua.color.xterm256, liv.lua.text.coerce, liv.lua.text.width, liv.lua.argument.parse, liv.lua.argument.format
+    Modules: liv.std.variable, liv.std.function, liv.std.option, liv.std.mapping, liv.std.popup, liv.std.exec, liv.std.window, liv.std.autocmd, liv.std.bufname, liv.std.process, liv.std.mark, liv.has, liv.lua.zlib.inflate, liv.lua.zlib.deflate, liv.lua.png.decode, liv.lua.png.encode, liv.lua.msgpack.pack, liv.lua.msgpack.unpack, liv.lua.color.rgb, liv.lua.color.hsl, liv.lua.color.xterm256, liv.lua.text.coerce, liv.lua.text.width, liv.lua.argument.parse, liv.lua.argument.format
     BREAKING: std modules renamed to align with denops/std vocabulary. API
     signatures are unchanged — only the module path/name moved. Update requires:
       liv.std.var   -> liv.std.variable
@@ -34,6 +34,22 @@ Unreleased
                              buffer.set_lines(b, 1, 1, lines)
                              open(b, opts)
     has("popup")/has("popup.border") unchanged.
+    FIX: liv.std.exec now runs its source as ONE script instead of one Ex
+    command per line, so multi-line block constructs (:if/:for/:while/:try/
+    :function/:def) execute correctly — previously a per-line loop opened the
+    block then parsed the next line in a fresh context, silently dropping the
+    body. Flat statement sequences and backslash-continuation behave as before;
+    no signature change.
+    ADD: liv.std.window gained open(bufnr, opts?) -> win and set_buffer(win,
+    bufnr). open displays a caller-owned buffer (create via liv.std.buffer) in a
+    NEW split window (opts: split=above|below|left|right, size, focus) and returns
+    its handle — the normal-split analogue of liv.std.popup's float overlay, so
+    closing the window never wipes the caller's buffer. set_buffer swaps the
+    buffer shown in a window. Purely additive.
+    ADD: liv.std.autocmd gained clear(group) — remove every subscription
+    registered under a group in one call (the canonical wipe-augroup-and-
+    re-register reload idiom, without retaining each sub). A no-op for a group
+    with no live subscriptions. Purely additive.
     ADD: new pure module liv.std.bufname — buffer-name codec mirroring
     denops/std bufname. format({scheme,expr,params?,fragment?}) -> string and
     parse(string) -> bufname over the wire form scheme://expr[;k=v&...][#fragment].

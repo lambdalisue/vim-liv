@@ -1,8 +1,16 @@
 -- liv.std.exec — run a block of vimscript (spec 0006). `liv.core.cmd` runs ONE Ex
 -- command; an author with a multi-line block of vimscript (especially one using
--- leading-backslash line continuations) has no single helper. `exec` fills that
--- gap: it joins continuation lines, then runs each resulting line as an Ex command
--- via `core.cmd`.
+-- leading-backslash line continuations, or a block construct like :if/:for/:try/
+-- :function) has no single helper. `exec` fills that gap: it joins continuation
+-- lines, then runs the whole block as ONE script via `core.cmd`.
+--
+-- The block runs as one script — NOT one Ex command per line — because a block
+-- construct's body only executes within the block's parse context: feeding the
+-- lines to `core.cmd` one at a time opens an `:if`/`:for` and then parses the
+-- next line in a fresh context, dropping the body (and corrupting later parsing).
+-- `core.cmd` already accepts a newline-joined multi-line script and preserves
+-- block context across it on both editors (vim.command / nvim_command), so a
+-- single `core.cmd(joined)` runs flat sequences AND blocks correctly.
 --
 -- Editor-dependent (it runs Ex commands through core), but there is NO backend
 -- split: `core.cmd` already absorbs the cross-editor difference, so the join logic
@@ -49,10 +57,11 @@ local function join_continuations(lines)
 end
 
 -- Run a block of vimscript. `source` is a multi-line string OR an array of lines;
--- leading-backslash continuation lines are joined to the previous line, then each
--- resulting line runs as an Ex command via `core.cmd`. Errors from a command
--- propagate (pcall-able), as with `core.cmd`. The module is a single callable
--- (the spec's `liv.std.exec` single-verb shape, like `liv.std.has`).
+-- leading-backslash continuation lines are joined to the previous line, then the
+-- whole block runs as ONE script via `core.cmd` (so block constructs like :if/:for
+-- keep their parse context). Errors propagate (pcall-able), as with `core.cmd`.
+-- The module is a single callable (the spec's `liv.std.exec` single-verb shape,
+-- like `liv.std.has`).
 ---@param source string|string[]
 return function(source)
   local lines
@@ -61,7 +70,5 @@ return function(source)
   else
     lines = split_lines(source)
   end
-  for _, line in ipairs(join_continuations(lines)) do
-    core.cmd(line)
-  end
+  core.cmd(table.concat(join_continuations(lines), "\n"))
 end

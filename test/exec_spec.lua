@@ -31,4 +31,19 @@ describe("liv.std.exec (L3)", function()
     exec({ "let g:liv_exec_arr_c =", "\\ 99" })
     assert.equal(99, core.eval("g:liv_exec_arr_c"))
   end)
+
+  -- A block construct (:if/:for/...) spans lines: its body only runs in the
+  -- block's parse context, so the lines must run as ONE script, not one Ex
+  -- command at a time (which loses the context and drops the body).
+  it("runs a multi-line :if block as one script", function()
+    core.cmd("let g:liv_exec_if = 0")
+    exec("if 1\nlet g:liv_exec_if = 5\nendif")
+    assert.equal(5, core.eval("g:liv_exec_if"))
+  end)
+
+  it("runs a multi-line :for loop body every iteration", function()
+    core.cmd("let g:liv_exec_for = 0")
+    exec("for i in [1, 2, 3]\nlet g:liv_exec_for += i\nendfor")
+    assert.equal(6, core.eval("g:liv_exec_for"))
+  end)
 end)

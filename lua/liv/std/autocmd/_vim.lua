@@ -17,6 +17,13 @@ return function(core)
   local autocmd_get = core.marshaled(vim.fn.autocmd_get)
   local seq = 0
 
+  -- Per caller-group teardown registry: maps the caller's `group` tag (or the
+  -- "liv_au" default for ungrouped subs) to a list of idempotent teardown closures,
+  -- one per subscription. `off()` IS its sub's teardown; `clear(group)` runs every
+  -- teardown for that group. Sharing one closure keeps both paths idempotent (so a
+  -- clear()'d sub's later off() is a harmless no-op, and vice versa).
+  local registry = {}
+
   -- Built in the rhs and evaluated when the event fires; <abuf> is empty for
   -- non-buffer events, so str2nr("") yields 0.
   local CTX =
@@ -45,29 +52,50 @@ return function(core)
     end
 
     -- Each subscription gets its own private augroup so off() removes exactly it.
+    -- The caller's `group` tag (or "liv_au" default) prefixes it AND keys the
+    -- teardown registry, so clear(group) can sweep all of that tag's subs.
     seq = seq + 1
-    local group = (opts.group or "liv_au") .. "_" .. seq
+    local gname = opts.group or "liv_au"
+    local group = gname .. "_" .. seq
 
     local once = opts.once and " ++once" or ""
     core.cmd("augroup " .. group)
     core.cmd(string.format("autocmd %s %s%s %s", ev, pat, once, dispatch.invoke_rhs(id, CTX)))
     core.cmd("augroup END")
 
+    -- Idempotent teardown: a second call (a repeat off(), an off() after a `once`
+    -- autocommand removed itself, or an off() after clear() already swept it) is a
+    -- no-op. The private group is cleared and deleted wholesale, so sibling
+    -- subscriptions (each in their own private group) are untouched.
     local removed = false
-    return {
-      -- Idempotent: a second off() (or off() after a `once` autocommand removed
-      -- itself) is a no-op. The private group is cleared and deleted wholesale, so
-      -- sibling subscriptions (each in their own private group) are untouched.
-      off = function()
-        if removed then
-          return
-        end
-        removed = true
-        pcall(core.cmd, "autocmd! " .. group)
-        pcall(core.cmd, "augroup! " .. group)
-        dispatch.unregister(id)
-      end,
-    }
+    local function teardown()
+      if removed then
+        return
+      end
+      removed = true
+      pcall(core.cmd, "autocmd! " .. group)
+      pcall(core.cmd, "augroup! " .. group)
+      dispatch.unregister(id)
+    end
+
+    registry[gname] = registry[gname] or {}
+    registry[gname][#registry[gname] + 1] = teardown
+    return { off = teardown }
+  end
+
+  ---Remove every subscription registered under `group` (each lives in its own
+  ---private augroup `<group>_<n>`, so they are torn down one by one). A no-op for a
+  ---group with no live subscriptions. Re-registering under the group works after.
+  ---@param group string
+  function M.clear(group)
+    local teardowns = registry[group]
+    if not teardowns then
+      return
+    end
+    registry[group] = nil
+    for _, teardown in ipairs(teardowns) do
+      teardown()
+    end
   end
 
   ---@param opts? liv.std.autocmd.list.opts

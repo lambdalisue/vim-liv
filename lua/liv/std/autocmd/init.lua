@@ -34,6 +34,7 @@
 ---@field on fun(events: string|string[], opts?: liv.std.autocmd.opts, handler: fun(ctx: liv.std.autocmd.ctx)): liv.std.autocmd.sub
 ---@field trigger fun(name: string)
 ---@field list fun(opts?: liv.std.autocmd.list.opts): liv.std.autocmd.info[]
+---@field clear fun(group: string)
 local core = require("liv.core")
 
 local backend = (core.is_nvim and require("liv.std.autocmd._nvim") or require(
@@ -71,6 +72,14 @@ end
 ---@return liv.std.autocmd.info[]
 function M.list(opts)
   return backend.list(opts or {})
+end
+
+-- Remove EVERY subscription registered under `group` in one call — the canonical
+-- "wipe my augroup and re-register on reload" idiom, without having to retain each
+-- `on()` sub. A no-op for a group that has no live subscriptions.
+---@param group string
+function M.clear(group)
+  return backend.clear(group)
 end
 
 return M

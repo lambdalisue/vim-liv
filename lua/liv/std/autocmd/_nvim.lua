@@ -8,6 +8,7 @@ return function(core)
   local exec_au = core.marshaled(vim.api.nvim_exec_autocmds)
   local create_augroup = core.marshaled(vim.api.nvim_create_augroup)
   local get_au = core.marshaled(vim.api.nvim_get_autocmds)
+  local clear_au = core.marshaled(vim.api.nvim_clear_autocmds)
 
   local M = {}
 
@@ -55,6 +56,15 @@ return function(core)
   ---@param name string the User event name to fire
   function M.trigger(name)
     exec_au("User", core.dict({ pattern = name, modeline = false }))
+  end
+
+  ---Remove every autocommand in the named group (the group is shared on Neovim,
+  ---so one native clear empties it). nvim_clear_autocmds raises if the group never
+  ---existed; guard it so clearing an unknown/empty group is a no-op. The group
+  ---persists (empty), so re-registering under it works.
+  ---@param group string
+  function M.clear(group)
+    pcall(clear_au, core.dict({ group = group }))
   end
 
   ---@param opts? liv.std.autocmd.list.opts

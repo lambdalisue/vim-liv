@@ -85,6 +85,41 @@ describe("liv.std.autocmd (L3)", function()
     sub_b.off()
   end)
 
+  it("clear(group) removes every subscription registered under that group", function()
+    local a, b = 0, 0
+    autocmd.on("User", { pattern = "LivAuClr", group = "LivAuClrGrp" }, function()
+      a = a + 1
+    end)
+    autocmd.on("User", { pattern = "LivAuClr", group = "LivAuClrGrp" }, function()
+      b = b + 1
+    end)
+    -- The canonical reload idiom: wipe the whole group, then nothing fires — and
+    -- the caller need not have retained every sub handle.
+    autocmd.clear("LivAuClrGrp")
+    autocmd.trigger("LivAuClr")
+    assert.equal(0, a)
+    assert.equal(0, b)
+    assert.equal(0, #autocmd.list({ event = "User", group = "LivAuClrGrp" }))
+  end)
+
+  it("clear(group) is a no-op for an unknown group", function()
+    autocmd.clear("LivAuNeverAGroup") -- must not raise
+  end)
+
+  it("a group can be re-registered after clear (idempotent reload)", function()
+    local n = 0
+    autocmd.on("User", { pattern = "LivAuReload", group = "LivAuReloadGrp" }, function()
+      n = n + 1
+    end)
+    autocmd.clear("LivAuReloadGrp")
+    local sub = autocmd.on("User", { pattern = "LivAuReload", group = "LivAuReloadGrp" }, function()
+      n = n + 1
+    end)
+    autocmd.trigger("LivAuReload")
+    assert.equal(1, n) -- only the re-registered handler fires, exactly once
+    sub.off()
+  end)
+
   it("once fires only a single time", function()
     local n = 0
     local sub = autocmd.on("User", { pattern = "LivAuOnce", once = true }, function()

@@ -29,6 +29,9 @@ describe("liv.std.cursor (L3)", function()
 
       cursor.hide()
       assert.are_not.equal(original, core.eval("&guicursor"))
+      -- The mechanism appends a transparent-highlight entry (fern's recipe), which
+      -- the original 'guicursor' never contains.
+      assert.is_true(core.eval("&guicursor"):find("LivCursorHidden") ~= nil)
 
       cursor.show()
       assert.equal(original, core.eval("&guicursor"))

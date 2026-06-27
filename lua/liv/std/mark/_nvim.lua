@@ -7,6 +7,7 @@ return function(core)
   local has = require("liv.std.has")
   local create_ns = core.marshaled(vim.api.nvim_create_namespace)
   local set_extmark = core.marshaled(vim.api.nvim_buf_set_extmark)
+  local get_lines = core.marshaled(vim.api.nvim_buf_get_lines)
   local del_extmark = core.marshaled(vim.api.nvim_buf_del_extmark)
   local clear_ns = core.marshaled(vim.api.nvim_buf_clear_namespace)
   local ns = create_ns("liv.std.mark")
@@ -30,11 +31,18 @@ return function(core)
     if opts.hl then
       o.line_hl_group = opts.hl
     end
+    local col = 0
     if opts.virt_text then
       local group = opts.virt_text_hl or opts.hl
       o.virt_text = group and { { opts.virt_text, group } } or { { opts.virt_text } }
+      -- Render the virtual text flush after the line's last character, matching
+      -- the Vim backend. Neovim's virt_text_pos="eol" leaves a one-cell gap
+      -- between the text and the chunk, so anchor it inline at the end-of-line
+      -- byte column instead (nothing follows it there, so nothing is shifted).
+      o.virt_text_pos = "inline"
+      col = #(get_lines(buf, line - 1, line, false)[1] or "")
     end
-    return set_extmark(buf, ns, line - 1, 0, core.dict(o))
+    return set_extmark(buf, ns, line - 1, col, core.dict(o))
   end
 
   ---@param buf integer

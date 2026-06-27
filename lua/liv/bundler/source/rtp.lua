@@ -20,33 +20,54 @@ end
 
 ---@param roots string[] lua/ directories to search, in order
 ---@param fs { exists: fun(p: string): boolean, read: fun(p: string): string? }
----@return { locate: fun(name: string): string?, read: fun(name: string): string? }
+---@return { locate: fun(name: string): string?, read: fun(name: string): string?, read_raw: fun(rel: string, name?: string): string?, manifest: fun(name: string): table? }
 function M.resolver(roots, fs)
   local resolvers = {}
   for _, root in ipairs(roots) do
     resolvers[#resolvers + 1] = path.resolver(root, fs)
   end
-  local function first(method, name)
+  -- The single root that OWNS a module: the first (highest-priority) root that can
+  -- locate it. A module and everything read on its behalf — source, manifest, and
+  -- companion files — must come from this one root, or a vendored module could mix
+  -- its Lua body with another root's (a different plugin/version) companion, which
+  -- would break bundle reproducibility and the lockfile's per-module provenance.
+  local function owner(name)
     for _, r in ipairs(resolvers) do
-      local got = r[method](name)
-      if got then
-        return got
+      if r.locate(name) then
+        return r
       end
     end
     return nil
   end
   return {
     locate = function(name)
-      return first("locate", name)
+      local r = owner(name)
+      return r and r.locate(name) or nil
     end,
     read = function(name)
-      return first("read", name)
+      local r = owner(name)
+      return r and r.read(name) or nil
     end,
-    read_raw = function(rel)
-      return first("read_raw", rel)
+    -- Read an arbitrary file relative to a root. When `name` is given, anchor to
+    -- that module's owning root so its companions are read from the SAME root that
+    -- supplied its source; without `name` (no owning module), fall back to the
+    -- first root that has the file.
+    read_raw = function(rel, name)
+      if name then
+        local r = owner(name)
+        return r and r.read_raw(rel) or nil
+      end
+      for _, r in ipairs(resolvers) do
+        local got = r.read_raw(rel)
+        if got then
+          return got
+        end
+      end
+      return nil
     end,
     manifest = function(name)
-      return first("manifest", name)
+      local r = owner(name)
+      return r and r.manifest(name) or nil
     end,
   }
 end

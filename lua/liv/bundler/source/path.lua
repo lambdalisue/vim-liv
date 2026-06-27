@@ -15,7 +15,7 @@ local load_chunk = loadstring or load -- 5.1 loadstring vs 5.2+ load
 
 ---@param root string the source `lua/` directory
 ---@param fs { exists: fun(path: string): boolean, read: fun(path: string): string? }
----@return { locate: fun(name): string?, read: fun(name): string?, read_raw: fun(rel): string?, manifest: fun(name): table? }
+---@return { locate: fun(name): string?, read: fun(name): string?, read_raw: fun(rel, name?): string?, manifest: fun(name): table? }
 function M.resolver(root, fs)
   local function locate(name)
     local rel = name:gsub("%.", "/")
@@ -27,7 +27,10 @@ function M.resolver(root, fs)
     return nil
   end
 
-  local function read_raw(rel)
+  -- A single-root resolver has no provenance ambiguity, so the optional owning
+  -- module `name` (used by the multi-root rtp resolver to anchor companion reads)
+  -- is accepted for interface parity and ignored here.
+  local function read_raw(rel, _name)
     return fs.read(root .. "/" .. rel)
   end
 

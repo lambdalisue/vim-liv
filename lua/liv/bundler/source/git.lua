@@ -35,7 +35,7 @@ end
 ---@param dest string clone destination (e.g. a temp dir)
 ---@param fs { exists: fun(p): boolean, read: fun(p): string? }
 ---@param exec fun(cmd: string): boolean
----@return { locate: fun(name): string?, read: fun(name): string?, read_raw: fun(rel): string?, manifest: fun(name): table? }
+---@return { locate: fun(name): string?, read: fun(name): string?, read_raw: fun(rel, name?): string?, manifest: fun(name): table? }
 function M.resolver(url, ref, dest, fs, exec)
   assert(M.fetch(url, ref, dest, exec), "liv.bundler: git fetch of " .. url .. " failed")
   return path.resolver(dest .. "/lua", fs)

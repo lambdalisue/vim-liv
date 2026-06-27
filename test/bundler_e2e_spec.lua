@@ -70,13 +70,14 @@ describe("bundler end-to-end (L3)", function()
     iofs.clean(tmp)
   end)
 
-  it("vendors a module's Vim 9 companion and runs it in isolation", function()
+  it("vendors a module's Vim 9 autoload companion and runs it in isolation", function()
     local root = assert(os.getenv("LIV_ROOT"), "LIV_ROOT not set")
     local tmp = os.tmpname()
     os.remove(tmp)
     tmp = tmp .. ".cmdplug"
 
-    -- liv.std.command pulls liv.std._dispatch, whose .vim is declared in a manifest
+    -- liv.std.command pulls liv.std._dispatch, whose Vim 9 autoload companion is
+    -- declared in a manifest.
     local resolver = pathsrc.resolver(root .. "/lua", iofs)
     vendor.vendor({
       roots = { "liv.std.command" },
@@ -86,18 +87,23 @@ describe("bundler end-to-end (L3)", function()
       plugin = "cmdp",
       source = "path",
     })
-    -- the Vim 9 companion was copied beside the vendored _dispatch.lua
-    assert.is_true(iofs.exists(tmp .. "/lua/cmdp/vendor/liv/std/_dispatch.vim"))
+    -- the autoload companion was relocated under the consumer's autoload/ tree, so
+    -- its #-name (cmdp#vendor#liv#std#dispatch#...) matches the rewritten .lua
+    assert.is_true(iofs.exists(tmp .. "/autoload/cmdp/vendor/liv/std/dispatch.vim"))
 
-    -- load the vendored command in isolation (on Vim this sources the vendored .vim
-    -- via _dispatch's own debug.getinfo path — proving the companion is in place)
+    -- load the vendored command in isolation: package.path points ONLY at the
+    -- vendored lua/, and the vendored autoload/ goes on &runtimepath so Vim
+    -- auto-sources the relocated companion on the first cmdp#vendor#... reference.
+    core.cmd("set runtimepath^=" .. tmp)
     local saved = package.path
     package.path = tmp .. "/lua/?.lua;" .. tmp .. "/lua/?/init.lua"
     local ok, command = pcall(require, "cmdp.vendor.liv.std.command")
     package.path = saved
     assert.is_true(ok, "requiring the vendored command failed: " .. tostring(command))
 
-    -- the vendored command actually defines and fires a user command
+    -- the vendored command actually defines and fires a user command (its rhs
+    -- calls cmdp#vendor#liv#std#dispatch#Invoke — proving both the relocation and
+    -- the #-name rewrite are correct end to end)
     local fired = false
     command.define("LivVendoredCmd", function()
       fired = true
@@ -107,6 +113,11 @@ describe("bundler end-to-end (L3)", function()
     command.remove("LivVendoredCmd")
 
     package.loaded["cmdp.vendor.liv.std.command"] = nil
+    -- Restore &runtimepath: this L3 suite runs many specs in one editor session,
+    -- and autoload resolution now depends on runtimepath, so a leaked (now-deleted)
+    -- entry would make later specs order-dependent. `-=` is the exact inverse of the
+    -- `^=` above — it removes precisely the entry we prepended.
+    core.cmd("set runtimepath-=" .. tmp)
     iofs.clean(tmp)
   end)
 end)

@@ -51,7 +51,8 @@ end
 ---@class liv.bundler.analyze.Closure
 ---@field modules string[] Sorted resolvable module names (incl. roots).
 ---@field external string[] Sorted unresolvable module names (recorded, not traversed).
----@field companions table<string, string[]> module name -> its declared companion files.
+---@field companions table<string, string[]> module name -> its declared (beside-module) companion files.
+---@field companions_autoload table<string, string[]> module name -> its declared autoload files (paths under autoload/).
 
 -- Compute the transitive closure of modules reachable from `roots`. Traversal
 -- follows static literal `require`s AND, when a `manifest` reader is given, each
@@ -65,7 +66,7 @@ end
 ---@param manifest? fun(name: string): { modules?: string[], files?: string[] }?
 ---@return liv.bundler.analyze.Closure closure The transitive dependency closure.
 function M.closure(roots, resolve, manifest)
-  local seen, external, companions = {}, {}, {}
+  local seen, external, companions, companions_autoload = {}, {}, {}, {}
   local queue = {}
   for _, r in ipairs(roots) do
     queue[#queue + 1] = r
@@ -88,6 +89,9 @@ function M.closure(roots, resolve, manifest)
           if m.files then
             companions[name] = m.files
           end
+          if m.autoload then
+            companions_autoload[name] = m.autoload
+          end
           for _, dyn in ipairs(m.modules or {}) do
             if not seen[dyn] then
               queue[#queue + 1] = dyn
@@ -97,7 +101,12 @@ function M.closure(roots, resolve, manifest)
       end
     end
   end
-  return { modules = sorted_keys(seen), external = sorted_keys(external), companions = companions }
+  return {
+    modules = sorted_keys(seen),
+    external = sorted_keys(external),
+    companions = companions,
+    companions_autoload = companions_autoload,
+  }
 end
 
 return M

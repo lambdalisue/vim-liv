@@ -12,16 +12,14 @@
 --
 -- Streaming needs a live job handle for write/close/kill, but Vim's if_lua
 -- cannot represent a job/channel value (vim.call("job_start",...) returns nil to
--- Lua), so the job lives entirely in the Vim 9 companion (_vim.vim): it is held
--- by a numeric id, and write/close/kill drive it through that id via core.call,
--- which marshals data/args as real arguments (never interpolated into a command
--- string). The exit_cb dispatches to Lua and then drops the registry entry.
+-- Lua), so the job lives entirely in the Vim 9 companion (autoload/liv/std/
+-- process.vim): it is held by a numeric id, and write/close/kill drive it through
+-- that id via core.call, which marshals data/args as real arguments (never
+-- interpolated into a command string). The companion is an autoload script, so
+-- Vim auto-sources it on the first liv#std#process#* call; the exit_cb dispatches
+-- to Lua and then drops the registry entry.
 return function(core)
   local M = {}
-
-  -- Source the companion once (it guards re-sourcing); it sits beside this file.
-  local here = debug.getinfo(1, "S").source:sub(2) -- strip the leading '@'
-  core.cmd("source " .. here:gsub("%.lua$", ".vim"))
 
   ---@param cmd string[]
   ---@param spawn_opts liv.std.process.spawn_opts?
@@ -91,19 +89,23 @@ return function(core)
     local cwd = opts.cwd ~= nil and opts.cwd or core.NIL
     local env = opts.env ~= nil and core.dict(opts.env) or core.NIL
 
-    local id = core.call("LivProcStart", cmd, out_cb, err_cb, exit_cb, cwd, env)
+    -- Call the companion by its autoload name. Vim auto-sources the autoload
+    -- script on first reference, and an autoload name resolves from any context
+    -- (including inside a Vim9 `:def`, e.g. a write driven by an autocmd that
+    -- dispatched through the dispatch trampoline).
+    local id = core.call("liv#std#process#Start", cmd, out_cb, err_cb, exit_cb, cwd, env)
 
     local function kill()
-      core.call("LivProcStop", id)
+      core.call("liv#std#process#Stop", id)
     end
     return {
       write = function(data)
-        core.call("LivProcSend", id, data)
+        core.call("liv#std#process#Send", id, data)
       end,
       close = function()
         -- Close the child's stdin so a stdin-reading child (e.g. cat) sees EOF
         -- and can finish; does not stop an already-running process.
-        core.call("LivProcCloseIn", id)
+        core.call("liv#std#process#CloseIn", id)
       end,
       kill = kill,
       stop = kill, -- alias

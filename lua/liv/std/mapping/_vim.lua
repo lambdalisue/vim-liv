@@ -2,7 +2,7 @@
 -- string rhs is used directly; a Lua-function rhs is registered with the Vim 9
 -- dispatch and invoked with the liv context table. A normal mapping invokes the
 -- handler from a `<Cmd>` rhs (which does not change mode); an `<expr>` mapping
--- evaluates `g:LivExprInvoke(...)` so the handler's return string — with its
+-- evaluates `liv#std#dispatch#ExprInvoke(...)` so the handler's return string — with its
 -- key-notation replaced by real termcodes — becomes the keys to type. The
 -- <buffer>/<silent>/<nowait> modifiers mirror the opts.
 local text = require("liv.lua.text.coerce")
@@ -14,12 +14,12 @@ return function(core)
   local ids = {} -- (mode .. lhs) -> handler id, so a re-map/del can unregister
 
   -- Shape an editor maparg/maplist dict into the liv info table. A Lua-function
-  -- rhs was set as a `<Cmd>call g:LivInvoke(...)` / `g:LivExprInvoke(...)` string
-  -- (the Vim 9 dispatch), so it is reported as the marker "<Lua function>" — the
-  -- internal dispatch string is not exposed. A genuine string rhs is verbatim.
+  -- rhs was set as a `<Cmd>call ...dispatch#Invoke(...)` / `...dispatch#ExprInvoke(...)`
+  -- string (the Vim 9 dispatch), so it is reported as the marker "<Lua function>"
+  -- — the internal dispatch string is not exposed. A genuine string rhs is verbatim.
   local function shape(d)
     local rhs = d.rhs or ""
-    if rhs:find("LivInvoke") or rhs:find("LivExprInvoke") then
+    if rhs:find("dispatch#Invoke", 1, true) or rhs:find("dispatch#ExprInvoke", 1, true) then
       rhs = "<Lua function>"
     end
     return {
@@ -62,9 +62,9 @@ return function(core)
         -- identical to the Neovim backend (mode() under <Cmd> reports "c" here).
         local ctx = string.format("{'count': v:count, 'register': v:register, 'mode': '%s'}", mode)
         if opts.expr then
-          rhs_str = string.format("g:LivExprInvoke('%s', %s)", id, ctx)
+          rhs_str = string.format("liv#std#dispatch#ExprInvoke('%s', %s)", id, ctx)
         else
-          rhs_str = string.format("<Cmd>call g:LivInvoke('%s', %s)<CR>", id, ctx)
+          rhs_str = string.format("<Cmd>call liv#std#dispatch#Invoke('%s', %s)<CR>", id, ctx)
         end
       else
         rhs_str = rhs

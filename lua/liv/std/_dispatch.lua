@@ -1,17 +1,13 @@
 -- liv.std._dispatch — Vim-side callback dispatch (internal to the _vim backends
--- of command/map/event). It sources the Vim 9 script companion (_dispatch.vim)
--- which holds Lua handlers as Funcrefs and invokes them from string-only rhs
--- contexts. Neovim does not use this -- its _nvim backends pass Lua callbacks to
--- the native API directly.
+-- of command/map/event). The Vim 9 script companion (autoload/liv/std/
+-- dispatch.vim) holds Lua handlers as Funcrefs and invokes them from string-only
+-- rhs contexts; Vim auto-sources it on the first liv#std#dispatch#* reference, so
+-- no explicit :source is needed. Neovim does not use this -- its _nvim backends
+-- pass Lua callbacks to the native API directly.
 --
 -- A factory: requires `core` so it can reach the editor and so tests could mock.
 return function(core)
   local unpack = table.unpack or unpack
-  -- Source the companion once (it guards against re-sourcing). The .vim sits
-  -- beside this file; resolve its absolute path from this module's source.
-  local here = debug.getinfo(1, "S").source:sub(2) -- strip the leading '@'
-  local vimfile = here:gsub("%.lua$", ".vim")
-  core.cmd("source " .. vimfile)
 
   local M = {}
 
@@ -33,13 +29,13 @@ return function(core)
       end
       return core.to_editor(handler(unpack(args, 1, n)))
     end
-    return core.call("LivRegister", wrapped)
+    return core.call("liv#std#dispatch#Register", wrapped)
   end
 
   -- Drop a handler by id.
   ---@param id string
   function M.unregister(id)
-    core.call("LivUnregister", id)
+    core.call("liv#std#dispatch#Unregister", id)
   end
 
   -- Register a `customlist` completion handler and return the NAME of the Vim
@@ -52,7 +48,7 @@ return function(core)
   ---@return string complete_func the Vim function name for -complete=customlist
   function M.register_complete(handler)
     local id = M.register(handler)
-    local name = core.call("LivCompleteRegister", id)
+    local name = core.call("liv#std#dispatch#CompleteRegister", id)
     return id, name
   end
 
@@ -68,7 +64,7 @@ return function(core)
   ---@return string func_name the Vim function name to assign to omnifunc/completefunc
   function M.register_function(handler)
     local id = M.register(handler)
-    local name = core.call("LivFuncRegister", id)
+    local name = core.call("liv#std#dispatch#FuncRegister", id)
     return id, name
   end
 
@@ -79,9 +75,9 @@ return function(core)
   ---@return string rhs
   function M.invoke_rhs(id, arg_expr)
     if arg_expr == nil or arg_expr == "" then
-      return string.format("call g:LivInvoke('%s')", id)
+      return string.format("call liv#std#dispatch#Invoke('%s')", id)
     end
-    return string.format("call g:LivInvoke('%s', %s)", id, arg_expr)
+    return string.format("call liv#std#dispatch#Invoke('%s', %s)", id, arg_expr)
   end
 
   return M

@@ -23,6 +23,22 @@ package.path = table.concat({
   package.path,
 }, ";")
 
+-- Put the vim-liv root and the plugin-under-test root on &runtimepath so the
+-- editor auto-sources their autoload/ companions (e.g. liv#std#process#Start) the
+-- same way an installed plugin would. package.path covers Lua `require`; autoload
+-- functions are resolved via runtimepath, and `--clean` reset it to defaults.
+do
+  local nvim = vim.api ~= nil
+  for _, p in ipairs({ root, project }) do
+    local cmd = "set runtimepath^=" .. vim.fn.fnameescape(p)
+    if nvim then
+      vim.api.nvim_command(cmd)
+    else
+      vim.command(cmd)
+    end
+  end
+end
+
 local tester = require("liv.tester")
 local select = require("liv.tester._select")
 tester.install()

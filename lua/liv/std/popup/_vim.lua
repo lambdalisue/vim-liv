@@ -41,6 +41,15 @@ return function(core)
   end
 
   -- Position (line/col, relative-aware) + anchor onto an options dict.
+  --
+  -- liv's contract is that {line, col} is the CONTENT top-left, with any border
+  -- drawn OUTWARD (so adding a border does not move the content — matching the
+  -- borderless case and the Neovim backend). Vim's popup_create instead positions
+  -- the OUTER corner (border included), so a bordered popup at {line, col} would
+  -- land its content one cell down/right. Shift the anchor up/left by one when a
+  -- border is present so the content lands at {line, col}. This handles the
+  -- default/NW (topleft) anchor — a bordered popup with a non-NW anchor is not
+  -- adjusted (unused; the offset direction would have to follow the corner).
   local function with_position(o, opts)
     if opts.anchor then
       o.pos = POS[opts.anchor]
@@ -49,11 +58,12 @@ return function(core)
       o.line = cursor_rel(opts.line)
       o.col = cursor_rel(opts.col)
     else
+      local bump = (opts.border and (opts.anchor == nil or opts.anchor == "NW")) and 1 or 0
       if opts.line then
-        o.line = opts.line
+        o.line = opts.line - bump
       end
       if opts.col then
-        o.col = opts.col
+        o.col = opts.col - bump
       end
     end
   end

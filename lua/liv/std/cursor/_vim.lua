@@ -10,9 +10,19 @@
 -- only as the relationship &t_ve == &t_vi, not as a value change.
 return function(core)
   -- Quote a value as a Vim string literal (single-quoted; '' escapes a quote), so
-  -- the termcap string (which may contain ESC bytes) round-trips through :let.
+  -- the termcap string (which may contain ESC bytes) round-trips through the command.
   local function vim_str(s)
     return "'" .. tostring(s):gsub("'", "''") .. "'"
+  end
+
+  -- Set &t_ve via :set (valid in ANY script context), not :let — `:let` is
+  -- rejected inside a Vim 9 `:def` (E1126), which is exactly where hide()/show()
+  -- run when called from an autocmd dispatched through the Vim 9 dispatch
+  -- trampoline (e.g. cursor.show on a BufLeave). escape() guards spaces and the
+  -- handful of :set metacharacters; the termcap value's ESC bytes pass through
+  -- literally.
+  local function set_t_ve(value)
+    core.cmd([[execute 'set t_ve=' .. escape(]] .. vim_str(value) .. [[, ' \|"')]])
   end
 
   -- saved holds the 't_ve' captured at hide() time; hidden guards idempotency.
@@ -26,7 +36,7 @@ return function(core)
       return
     end
     saved = core.eval("&t_ve")
-    core.cmd("let &t_ve = " .. vim_str(core.eval("&t_vi")))
+    set_t_ve(core.eval("&t_vi"))
     hidden = true
   end
 
@@ -34,7 +44,7 @@ return function(core)
     if not hidden then
       return
     end
-    core.cmd("let &t_ve = " .. vim_str(saved))
+    set_t_ve(saved)
     saved = nil
     hidden = false
   end

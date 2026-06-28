@@ -83,6 +83,32 @@ describe("liv.std.mapping (L3)", function()
     assert.equal("", core.call("maparg", "<F11>", "n"))
   end)
 
+  it("keeps buffer-local maps of the same lhs on different buffers independent", function()
+    -- Regression: tracking handlers by (mode, lhs) alone made mapping the same
+    -- buffer-local lhs on a SECOND buffer unregister the FIRST buffer's still-live
+    -- handler, so the first buffer's rhs later invoked a dead dispatch id (E716 on
+    -- Vim). Each buffer must keep its own handler.
+    local buffer = require("liv.std.buffer")
+    local hits = {}
+    local a = buffer.create({ scratch = true })
+    core.cmd("buffer " .. a)
+    map.set("n", "<F8>", { buffer = true }, function()
+      hits[#hits + 1] = "a"
+    end)
+    local b = buffer.create({ scratch = true })
+    core.cmd("buffer " .. b)
+    map.set("n", "<F8>", { buffer = true }, function()
+      hits[#hits + 1] = "b"
+    end)
+    core.call("feedkeys", core.eval([["\<F8>"]]), "x") -- B's handler
+    core.cmd("buffer " .. a)
+    core.call("feedkeys", core.eval([["\<F8>"]]), "x") -- A's handler (must still live)
+    assert.same({ "b", "a" }, hits)
+    map.del("n", "<F8>", { buffer = true })
+    core.cmd("buffer " .. b)
+    map.del("n", "<F8>", { buffer = true })
+  end)
+
   it("returns a subscription whose off() removes the mapping", function()
     local sub = map.set("n", "<F6>", function() end)
     assert.are_not.equal("", core.call("maparg", "<F6>", "n"))

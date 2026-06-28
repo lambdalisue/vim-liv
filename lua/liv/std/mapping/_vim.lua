@@ -11,7 +11,20 @@ return function(core)
   local dispatch = require("liv.std._dispatch")(core)
   local maparg = core.marshaled(vim.fn.maparg)
   local maplist = core.marshaled(vim.fn.maplist)
-  local ids = {} -- (mode .. lhs) -> handler id, so a re-map/del can unregister
+  local bufnr = core.marshaled(vim.fn.bufnr)
+  local ids = {} -- map key -> handler id, so a re-map/del can unregister
+
+  -- The `ids` key for a mapping. A buffer-local map is keyed per (mode, lhs,
+  -- buffer): the SAME lhs mapped buffer-locally on two buffers must track two
+  -- distinct handlers. Keying by (mode .. lhs) alone would make mapping it on
+  -- buffer B `drop` (unregister) buffer A's still-live handler, leaving A's rhs
+  -- calling a now-dead dispatch id (E716). A global map keeps the plain key.
+  local function mapkey(mode, lhs, buffer)
+    if buffer then
+      return mode .. "\0" .. lhs .. "\0" .. bufnr("")
+    end
+    return mode .. lhs
+  end
 
   -- Shape an editor maparg/maplist dict into the liv info table. A Lua-function
   -- rhs was set as a `<Cmd>call ...dispatch#Invoke(...)` / `...dispatch#ExprInvoke(...)`
@@ -50,9 +63,9 @@ return function(core)
   ---@param opts? liv.std.mapping.opts
   ---@param rhs string|fun(ctx: liv.std.mapping.ctx): string?
   function M.set(modes, lhs, opts, rhs)
-    local keys = {} -- the (mode .. lhs) keys this call created, for off()
+    local keys = {} -- the ids keys this call created, for off()
     for _, mode in ipairs(text.aslist(modes)) do
-      local key = mode .. lhs
+      local key = mapkey(mode, lhs, opts.buffer)
       drop(key) -- re-mapping the same key first frees the prior handler
       local rhs_str
       if type(rhs) == "function" then
@@ -114,8 +127,11 @@ return function(core)
     opts = opts or {}
     for _, mode in ipairs(text.aslist(modes)) do
       local buffer = opts.buffer and "<buffer> " or ""
+      -- Compute the ids key BEFORE the unmap (a buffer-local key reads the current
+      -- buffer, which the unmap does not change, but order it defensively).
+      local key = mapkey(mode, lhs, opts.buffer)
       core.cmd(mode .. "unmap " .. buffer .. lhs)
-      drop(mode .. lhs)
+      drop(key)
     end
   end
 
